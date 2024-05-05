@@ -1,12 +1,14 @@
 var HugeNumber = (function () {
     class HugeNumber {
-        constructor(sign, n, alpha) {
-            if(alpha === n) {
-                this.n = n;
-                this.alpha = alpha;
-            }
+        constructor(sign, array) {
+            this.sign = sign;
+            this.array = array;
         }
-    };
+
+        normalize() {
+            if(this.array)
+        }
+    }
     return HugeNumber;
 })();
 
