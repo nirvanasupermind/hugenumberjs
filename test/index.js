@@ -33,4 +33,4 @@ function hyperE(a, h) {
     }
 }
 
-console.log(hyperE([ 2, 2.0001 ], [ 2 ]));
+console.log(hyperE([ 10, 5 ], [ 2 ]));
