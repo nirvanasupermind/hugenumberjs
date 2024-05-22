@@ -32,91 +32,6 @@ var HugeNumber = (function () {
         }
     }
 
-    function normalize(array, depth = 0) {
-        if(typeof array === "number") {
-            return array;
-        }
-    
-        var a = array[0];
-        var b = normalize(array[1], ++depth);
-        if(b === 1) {
-            // (already handled by other rules, but added to speed things up)
-            return a;
-        }
-    
-        if(depth > maxDepth && array[array.length - 1] !== 1) {
-            return array;
-        } else if(array.length === 0) {
-            return 1;
-        } else if(array.length === 1) {
-            return a;
-        } else if(array.length === 2) {
-            var result = Math.pow(array[0], array[1])
-            return Number.isFinite(result) ? result : array;
-        } else if(array[array.length - 1] === 1) {
-            return normalize(array.slice(0, -1), ++depth);
-        } else if(normalize(array[2], ++depth) === 1 && 1 <= b && b < 2) {
-            var n = 0;
-            for(var i = 2; i < array.length; i++) {
-                if(array[i] === 1) {
-                    n++;
-                } else {
-                    break;
-                }
-            }
-            var c = array[n + 2];
-            var pound = array.slice(n + 3);
-            return normalize(new Array(n + 1).fill(a).concat([Math.pow(a, b - 1), c - 1]).concat(pound), ++depth);
-        } else if(array[2] === 1 && (b >= 2 && b < maxDepth || Array.isArray(b))) {
-            var n = 0;
-            for(var i = 2; i < array.length; i++) {
-                if(array[i] === 1) {
-                    n++;
-                } else {
-                    break;
-                }
-            }
-            var c = array[n + 2];
-            var pound = array.slice(n + 3);
-            var array2 = [...array];
-            if(typeof array2[1] === "number") {
-                array2[1]--;
-            }
-            return normalize(new Array(n + 1).fill(a).concat([normalize(array2, ++depth), c - 1, ...pound]), ++depth);
-        } else if(1 < array[2] && array[2] < 2) {
-            var pound = array.slice(3);
-            var x = normalize([a, b, 1, ...pound], ++depth);
-            var y = normalize([a, b, 2, ...pound], ++depth);
-            if(typeof x === "number" && typeof y === "number") {
-                return Math.pow(x, 2 - array[2]) * Math.pow(y, array[2] - 1);
-             } else if(typeof x === "number") {
-                x = [y[0], Math.log(x)/Math.log(y[0])];
-            }
-            
-           if(typeof x[1] === "number" && typeof y[1] === "number") {
-                return [y[0], x[1] * (2 - array[2]) + y[1] * (array[2] - 1)];
-           }  else if(typeof x[1] === "number"  && typeof y[1][1] === "number") {
-                return [y[0], [y[0], y[1][1] + Math.log(array[2] - 1)/Math.log(y[0])]];
-            } else {
-                return y;
-            }
-        } else if(1 <= b && b < 2 && (array[2] >= 2 || Array.isArray(array[2]))) {
-            var pound = array.slice(3);
-            return normalize([a, Array.isArray(b) ? [a, b] : Math.pow(a, b - 1), (typeof array[2] === "number" ? array[2] - 1 : normalize(array[2], ++depth)), ...pound], ++depth);
-        } else if(((b >= 2 && b < 10) || Array.isArray(b)) && (array[2] >= 2 || Array.isArray(array[2]))) {
-            var pound = array.slice(3);
-            var array2 = [...array];
-            if(!Array.isArray(array2[1])) {
-                array2[1]--;
-            }
-            return normalize([a, normalize(array2, ++depth), array[2] - 1, ...pound], ++depth);
-        } else {
-            return array;
-            // throw new Error("no rule found: " + JSON.stringify(array));
-        }
-    }
-
-
     function normalize10(array, depth = 0, a = 10) {
         if(typeof array === "number") {
             return array;
@@ -133,7 +48,8 @@ var HugeNumber = (function () {
         } else if(array.length === 0) {
             return a;
         } else if(array.length === 1) {
-            var result = Math.pow(array[0], array[1])
+            var result = Math.pow(a, array[0]);
+
             return Number.isFinite(result) ? result : array;
         } else if(array[array.length - 1] === 1) {
             return normalize10(array.slice(0, -1), ++depth);
@@ -166,32 +82,36 @@ var HugeNumber = (function () {
             }
             return normalize10(new Array(n).fill(a).concat([normalize10(array2, ++depth), c - 1, ...pound]), ++depth);
         } else if(1 < array[1] && array[1] < 2) {
-            var pound = array.slice(3);
-            var x = normalize10([a, b, 1, ...pound], ++depth);
-            var y = normalize10([a, b, 2, ...pound], ++depth);
+            var pound = array.slice(2);
+            var x = normalize10([b, 1, ...pound], ++depth);
+            var y = normalize10([b, 2, ...pound], ++depth);
             if(typeof x === "number" && typeof y === "number") {
                 return Math.pow(x, 2 - array[1]) * Math.pow(y, array[1] - 1);
              } else if(typeof x === "number") {
-                x = [y[0], Math.log(x)/Math.log(y[0])];
+                x = [Math.log(x)/Math.log(a)];
+            }
+
+            if(y.length > 1) {
+                return y;
             }
             
-           if(typeof x[1] === "number" && typeof y[1] === "number") {
-                return [y[0], x[1] * (2 - array[1]) + y[1] * (array[1] - 1)];
-           }  else if(typeof x[1] === "number"  && typeof y[1][1] === "number") {
-                return [y[0], [y[0], y[1][1] + Math.log(array[1] - 1)/Math.log(y[0])]];
+           if(typeof x[0] === "number" && typeof y[0] === "number") {
+            return normalize10([x[0] * (2 - array[1]) + y[0] * (array[1] - 1)], ++depth);
+           }  else if(typeof x[0] === "number"  && typeof y[0][0] === "number") {
+                return normalize10([[y[0][0] + Math.log(array[1] - 1)/Math.log(a)]], ++depth);
             } else {
                 return y;
             }
         } else if(1 <= b && b < 2 && (array[1] >= 2 || Array.isArray(array[1]))) {
             var pound = array.slice(3);
-            return normalize10([a, Array.isArray(b) ? [a, b] : Math.pow(a, b - 1), (typeof array[1] === "number" ? array[1] - 1 : normalize10(array[1], ++depth)), ...pound], ++depth);
+            return normalize10([Array.isArray(b) ? [b] : Math.pow(a, b - 1), (typeof array[1] === "number" ? array[1] - 1 : normalize10(array[1], ++depth)), ...pound], ++depth);
         } else if(((b >= 2 && b < 10) || Array.isArray(b)) && (array[1] >= 2 || Array.isArray(array[1]))) {
             var pound = array.slice(3);
             var array2 = [...array];
             if(!Array.isArray(array2[1])) {
                 array2[1]--;
             }
-            return normalize10([a, normalize10(array2, ++depth), array[1] - 1, ...pound], ++depth);
+            return normalize10([normalize10(array2, ++depth), array[1] - 1, ...pound], ++depth);
         } else {
             return array;
             // throw new Error("no rule found: " + JSON.stringify(array));

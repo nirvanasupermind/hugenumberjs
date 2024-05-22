@@ -1,6 +1,6 @@
 var HugeNumber = require("../HugeNumber.js");
 var maxDepth = Infinity;
-console.log(new HugeNumber(1, [2]));
+console.log(new HugeNumber(1, [2,3]));
 
 
 
