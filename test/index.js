@@ -1,7 +1,5 @@
 var HugeNumber = require("../HugeNumber.js");
-var maxDepth = Infinity;
-console.log(new HugeNumber(1, [2,3]));
-
+console.log(new HugeNumber(1, [3, 2]).div(new HugeNumber(1, [2.9, 2])).toString());
 
 
 
@@ -20,7 +18,8 @@ console.log(new HugeNumber(1, [2,3]));
 //         return a;
 //     }
 
-//     if(depth > maxDepth && array[array.length - 1] !== 1) {
+//     if(depth > maxDepth && array[array.lengt
+// h - 1] !== 1) {
 //         return array;
 //     } else if(array.length === 0) {
 //         return 1;
