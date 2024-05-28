@@ -1,12 +1,12 @@
 var HugeNumber = (function () {
     var maxDepth = Infinity;
     var cap = 1000;
-
+    var tetrationCap = 50;
 
 
     // Arrow notation with standard numbers
     function arrow(a, x, y) {
-        if (a >= 2 && x >= 4 && y >= 3) {
+        if ((a >= 2 && x >= 4 && y > 2) || (a > 1.1 && x >= 7448)) {
             return Infinity;
         }
 
@@ -201,6 +201,9 @@ var HugeNumber = (function () {
         }
 
         clone() {
+            if(typeof this.array === "number") {
+                return new HugeNumber(this.sign, this.array);
+            }
             return new HugeNumber(this.sign, [...this.array]);
         }
 
@@ -250,13 +253,17 @@ var HugeNumber = (function () {
             if(typeof other === "number") {
                 other = HugeNumber.fromNumber(other);
             }
-
+            
             if(this.sign === -1 && other.sign === -1) {
                 return this.abs().sub(other.abs()).neg();
             } else if(this.sign === -1 && other.sign === 1) {
                 return this.abs().add(other).neg();
             } else if(this.sign === 1 && other.sign === -1) {
                 return this.add(other.abs());
+            } else if(this.eq(other)) {
+                return new HugeNumber(1, 0);
+            }  else if(this.lt(other)) {
+                return other.sub(this).neg();
             } else if (typeof this.array === "number" && typeof other.array === "number") {
                 return new HugeNumber(1, this.array - other.array);
             } else if (this.array.length === 1 && other.array.length === 1) {
@@ -294,7 +301,7 @@ var HugeNumber = (function () {
                 }
             } else if (this.array.length === 2 && this.array[1] === 2
                 && other.array.length === 2 && other.array[1] == 2) {
-                var doubleLogThis = arrow(10, this.array[0] - 2, 2);
+                    var doubleLogThis = arrow(10, this.array[0] - 2, 2);
                 var doubleLogOther = arrow(10, other.array[0] - 2, 2);
                 var gaussianLog = Math.log10(1 + Math.pow(10, doubleLogOther - doubleLogThis));
                 var doubleLogResult = doubleLogThis + gaussianLog
@@ -335,8 +342,14 @@ var HugeNumber = (function () {
         }
 
         pow10() {
-            if (typeof this.array === "number") {
-                return new HugeNumber(1, [this.array]);
+            if(this.sign === -1) {
+                return new HugeNumber(1, 1).div(this.abs().pow10());
+            } else if (typeof this.array === "number") {
+                if(this.array < 1) {
+                    return new HugeNumber(1, Math.pow(10, this.array));
+                } else {
+                    return new HugeNumber(1, [this.array]);
+                }
             } else if (this.array.length === 1) {
                 return new HugeNumber(1, [inverseArrow(10, this.array, 2) + 2, 2]);
             } else if (this.array.length === 2 && this.array[1] === 2) {
@@ -366,11 +379,60 @@ var HugeNumber = (function () {
             return other.mul(this.log10()).pow10();
         }
 
+        tetr(other) {
+            if(typeof other === "number") {
+                other = HugeNumber.fromNumber(other);
+            }
+
+            if(other.array >= 0 && other.array <= 1) {
+                return this.pow(other);
+            } else if(other.array <= tetrationCap) {
+                return this.pow(this.tetr(other.array - 1));
+            } else if(this.array < 1.444667861009766) {
+                return this.tetr(tetrationCap);
+            } else {
+                var tetratedToCap = this.tetr(tetrationCap);
+                if(tetratedToCap.array.length === 2 & tetratedToCap.array[1] === 2) {
+                    var offset = tetratedToCap.array[0] - tetrationCap;
+                    return other.add(offset).tetr10();
+                } else {
+                    return other.max(tetratedToCap).tetr10();                    
+                }
+            } 
+        }
+
+        tetr10() {
+            if(typeof this.array === "number") {
+                return new HugeNumber(1, [this.array, 2]);
+            } else if(this.array.length === 1) {
+                var slogthis = inverseArrow(10, this.array[0], 2) + 1;
+                var sslogthis = inverseArrow(10, slogthis, 3) + 1;
+                return new HugeNumber(1, [sslogthis + 1, 3]);
+            }  else if(this.array.length === 2 && this.array[1] === 2) {
+                var sslogthis = inverseArrow(10, this.array[0], 3) + 1;
+                return new HugeNumber(1, [sslogthis + 1, 3]);
+            }  else if(this.array.length === 2 && this.array[1] === 3) {
+                return new HugeNumber(1, [this.array[0] + 1, 3]);
+            }  else {
+                return this.clone();
+            }
+        }
+
         cmp(other) {
             if(this.array.length > other.array.length) {
                 return 1;
             } else if(this.array.length < other.array.length) {
                 return -1;
+            } else if(this.array < other.array) {
+                return -1;
+            } else if(this.array === other.array) {
+                return 0;
+            } else if(this.array > other.array) {
+                return 1;
+            } else if(typeof this.array === "number" && typeof other.array !== "number") {
+                return -1;
+            } else if(typeof this.array !== "number" && typeof other.array === "number") {
+                return 1;
             } else {
                 for(var i = 0; i < this.array.length; i++) {
                     if(this.array[i] > other.array[i]) {
@@ -385,14 +447,39 @@ var HugeNumber = (function () {
             
         }
 
+        eq(other) {
+            return this.cmp(other) === 0;
+        }
+
+        ne(other) {
+            return this.cmp(other) !== 0;
+        }
+
         lt(other) {
             return this.cmp(other) < 0;
+        }
+
+        le(other) {
+            return this.cmp(other) <= 0;
+        }
+
+        gt(other) {
+            return this.cmp(other) > 0;
+        }
+
+        ge(other) {
+            return this.cmp(other) >= 0;
         }
 
         max(other) {
             return this.lt(other) ? other.clone() : this.clone();
         }
 
+        min(other) {
+            return this.lt(other) ? this.clone() : other.clone();
+        }
+
+        
         toNumber() {
             if(typeof this.array === "number") {
                 return this.sign * this.array;
@@ -425,7 +512,7 @@ var HugeNumber = (function () {
         
 
         static fromNumber(num) {
-            return new HugeNumber(num < 0 ? -1 : 1, num);
+            return new HugeNumber(num < 0 ? -1 : 1, Math.abs(num));
         }
     }
 
