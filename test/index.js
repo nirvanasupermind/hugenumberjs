@@ -1,6 +1,6 @@
 var HugeNumber = require("../HugeNumber.js");
-var x = new HugeNumber(1, [ 2.37, 3 ]);
-console.log(x.tetr( new HugeNumber(1, [ 7.425818881299993e+161 ])));
+var x = HugeNumber.fromNumber(1.449);
+console.log(x.tetr(50).toString());
 // function normalize(array, depth = 0) {
 //     if(typeof array === "number") {
 //         return array;
