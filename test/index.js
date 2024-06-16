@@ -1,6 +1,6 @@
 var HugeNumber = require("../HugeNumber.js");
-var x = HugeNumber.fromNumber(1.449);
-console.log(x.tetr(50).toString());
+var x = HugeNumber.fromNumber(Infinity);
+console.log(HugeNumber.fromNumber(8).arrow(10, 3).toString());
 // function normalize(array, depth = 0) {
 //     if(typeof array === "number") {
 //         return array;
@@ -21,7 +21,8 @@ console.log(x.tetr(50).toString());
 //     } else if(array.length === 1) {
 //         return a;
 //     } else if(array.length === 2) {
-//         var result = Math.pow(array[0], array[1])
+//         var result = Math.pow(array[0], array[1
+// ])
 //         return Number.isFinite(result) ? result : array;
 //     } else if(array[array.length - 1] === 1) {
 //         return normalize(array.slice(0, -1), ++depth);
