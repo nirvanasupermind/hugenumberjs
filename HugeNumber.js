@@ -70,7 +70,6 @@ var HugeNumber = (function () {
 
     function normalize(array, base = 10) {
         var b = array[0];
-
         if (array.length === 0 || b === 1) {
             return base;
         } else if (array.length === 1) {
@@ -318,10 +317,10 @@ var HugeNumber = (function () {
                 if (Number.isFinite(doubleLogResult)) {
                     return new HugeNumber(sign, [inverseArrow(10, doubleLogResult, 2) + 2, 2]);
                 } else {
-                    return this.max(other);
+                    return this.max(other).abs().mul(sign);
                 }
             } else {
-                return this.max(other);
+                return this.max(other).abs().mul(sign);
             }
         }
 
@@ -344,8 +343,12 @@ var HugeNumber = (function () {
                 } else {
                     return this.max(other);
                 }
+            } else if(this.lt(other)) {
+                return new HugeNumber(1, [-Infinity]);
+            } else if(this.eq(other)) {
+                return new HugeNumber(1, [1]);
             } else {
-                return this.max(other);
+                return other.clone().abs().mul(sign);
             }
         }
 
@@ -379,7 +382,6 @@ var HugeNumber = (function () {
             if (typeof other === "number") {
                 other = HugeNumber.fromNumber(other);
             }
-
             return other.mul(this.log10()).pow10();
         }
 
@@ -459,6 +461,12 @@ var HugeNumber = (function () {
                 } else {
                     return this.clone();
                 }
+            }  else if(arrows.array.length === 1) {
+                return new HugeNumber(1, [2 + Math.log10(2), 1, 2]);
+            } else if(arrows.array.length === 2) {
+                return new HugeNumber(1, [2 + Math.log10(arrows.array[1]), 1, 2]);
+            } else {
+                
             }
         }
 
@@ -474,16 +482,17 @@ var HugeNumber = (function () {
             if(arrows.eq(1) || other.ge(0) && other.le(1)) {
                 return this.pow(other);
             }  else if(arrows.gt(1) && arrows.lt(2)) {
-                return this.pow(other).pow(2 - arrows).mul(this.tetr(other).pow(arrows - 1));
+                return this.pow(other).pow(HugeNumber.fromNumber(2).sub(arrows)).mul(this.tetr(other).pow(arrows.sub(1)));
             } else if(arrows.eq(2)) {
                 return this.tetr(other);
-            } else if(arrows.le(3) && other.le(100)) {
+            } else if(other.le(100)) {
+                // console.log("!", arrows.sub(1).toString());
                 return this.arrow(this.arrow(other.sub(1), arrows), arrows.sub(1));
             }
 
             var num = arrow(this.toNumber(), other.toNumber(), arrows.toNumber());
             if(Number.isFinite(num)) {
-                return num;
+                return HugeNumber.fromNumber(num);
             }
 
             return other.arrow10(arrows);
@@ -525,7 +534,7 @@ var HugeNumber = (function () {
             } else if (this.array.length < other.array.length) {
                 return -1;
             } else {
-                for (var i = 0; i < this.array.length; i++) {
+                for (var i = this.array.length - 1; i >= 0; i--) {
                     if (this.array[i] > other.array[i]) {
                         return 1;
                     } else if (this.array[i] < other.array[i]) {
@@ -607,7 +616,7 @@ var HugeNumber = (function () {
             } else if (this.array.length === 2 && this.array[1] === 4) {
                 return "10^^^^" + this.array[0];
             } else {
-                return "{10, " + this.array.join(", ") + "}";
+                return "{10," + this.array.join(",") + "}";
             }
         }
 
