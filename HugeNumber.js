@@ -1,5 +1,5 @@
 var HugeNumber = (function () {
-    const MAX_DEPTH = 20;
+    const MAX_DEPTH = 10;
     function normalize(array, depth = 0) {
         if(depth > MAX_DEPTH || typeof array === "number") {
             return array;
