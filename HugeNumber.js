@@ -1,6 +1,8 @@
 var HugeNumber = (function () {
     const NORMALIZE_CAP = 100;
-    const NORMALIZE_RECURSION_CAP = 100;
+    // Global variable is very non-ideal but this is the only way the code runs
+    var normalizeDepth = 0;
+    const MAX_NORMALIZE_DEPTH = 10;
     const ETH_ROOT_OF_E = 1.444667861009766;
     
     // found here:
@@ -81,9 +83,9 @@ var HugeNumber = (function () {
     }
 
 
-    function normalize(array, depth = 0, base = 10) {
-        console.log(array, depth);
-        if(depth > 10) {
+    function normalize(array, base = 10) {
+        normalizeDepth++;
+        if(normalizeDepth > MAX_NORMALIZE_DEPTH) {
             return array;
         }
 
@@ -100,7 +102,7 @@ var HugeNumber = (function () {
         } else if(!Number.isFinite(array[0])) {
             return [array[0]];
         } else if (array[array.length - 1] === 1) {
-            return normalize(array.slice(0, -1), ++depth);
+            return normalize(array.slice(0, -1));
         } else if (array[1] === 1) {
             var n = 0;
             for (var i = 1; i < array.length; i++) {
@@ -118,8 +120,8 @@ var HugeNumber = (function () {
                 array2[n + 1] = 1;
                 var array3 = [...array];
                 array3[n + 1] = 2;
-                var normalizedArray2 = normalize(array2, ++depth);
-                var normalizedArray3 = normalize(array3, ++depth);
+                var normalizedArray2 = normalize(array2);
+                var normalizedArray3 = normalize(array3);
                 if (typeof normalizedArray2 === "number") {
                     normalizedArray2 = [Math.log(normalizedArray2) / Math.log(base)];
                 }
@@ -127,18 +129,18 @@ var HugeNumber = (function () {
                     normalizedArray3 = [Math.log(normalizedArray3) / Math.log(base)];
                 }
                 if (normalizedArray2.length === 1 && normalizedArray3.length === 1) {
-                    return normalize([normalizedArray2[0] * (2 - c) + normalizedArray3[0] * (c - 1)], ++depth);
+                    return normalize([normalizedArray2[0] * (2 - c) + normalizedArray3[0] * (c - 1)]);
                 } else {
-                    return normalize(normalizedArray3, ++depth);
+                    return normalize(normalizedArray3);
                 }
             } else if (1 <= b && b < 2) {
-                return normalize(new Array(n).fill(base).concat([Math.pow(base, b - 1), c - 1]).concat(pound), ++depth);
+                return normalize(new Array(n).fill(base).concat([Math.pow(base, b - 1), c - 1]).concat(pound));
             } else {
                 var array2 = [...array];
                 array2[0]--;
-                var normalizedArray2 = normalize(array2, ++depth);
+                var normalizedArray2 = normalize(array2);
                 if (typeof normalizedArray2 === "number") {
-                    return normalize(new Array(n).fill(base).concat([normalizedArray2, c - 1, ...pound]), ++depth);
+                    return normalize(new Array(n).fill(base).concat([normalizedArray2, c - 1, ...pound]));
                 } else {
                     return ceilArray(array);
                 }
@@ -156,9 +158,9 @@ var HugeNumber = (function () {
             var pound = array.slice(n + 2);
             var array2 = [...array];
             array2[0]--;
-            var normalizedArray2 = normalize(array2, ++depth);
+            var normalizedArray2 = normalize(array2);
             if (typeof normalizedArray2 === "number") {
-                return normalize(new Array(n).fill(base).concat([normalizedArray2, c - 1, ...pound]), ++depth);
+                return normalize(new Array(n).fill(base).concat([normalizedArray2, c - 1, ...pound]));
             } else {
                 return ceilArray(array);
             }
@@ -168,8 +170,8 @@ var HugeNumber = (function () {
             array2[1] = 1;
             var array3 = [...array];
             array3[1] = 2;
-            var normalizedArray2 = normalize(array2, ++depth);
-            var normalizedArray3 = normalize(array3, ++depth);
+            var normalizedArray2 = normalize(array2);
+            var normalizedArray3 = normalize(array3);
             if (typeof normalizedArray2 === "number") {
                 normalizedArray2 = [Math.log(normalizedArray2) / Math.log(base)];
             }
@@ -177,28 +179,28 @@ var HugeNumber = (function () {
                 normalizedArray3 = [Math.log(normalizedArray3) / Math.log(base)];
             }
             if (normalizedArray2.length === 1 && normalizedArray3.length === 1) {
-                return normalize([normalizedArray2[0] * (2 - c) + normalizedArray3[0] * (c - 1)], ++depth);
+                return normalize([normalizedArray2[0] * (2 - c) + normalizedArray3[0] * (c - 1)]);
             } else {
-                return normalize(normalizedArray3, ++depth);
+                return normalize(normalizedArray3);
             }
         } else if (1 <= b && b <= 2 && array[1] >= 2 && array[1] < Number.MAX_SAFE_INTEGER) {
             var c = array[1];
             var pound = array.slice(2);
-            return normalize([Math.pow(base, b - 1), c - 1, ...pound], ++depth);
-        } /* else if (b >= 2 && b < NORMALIZE_CAP && array[1] >= 2 && array[1] < NORMALIZE_CAP) {
+            return normalize([Math.pow(base, b - 1), c - 1, ...pound]);
+        } else if (b >= 2 && b < NORMALIZE_CAP && array[1] >= 2 && array[1] < NORMALIZE_CAP) {
             var c = array[1];
             var pound = array.slice(2);
             var array2 = [...array];
             array2[0]--;
             // console.log("!", depth, array, array2);
-            var normalizedArray2 = normalize(array2, ++depth);
+            var normalizedArray2 = normalize(array2);
             if (typeof normalizedArray2 === "number") {
-                return normalize([normalizedArray2, c - 1, ...pound], ++depth);
+                return normalize([normalizedArray2, c - 1, ...pound]);
             } else {
                 return ceilArray(array);
             }
-        } */ else {
-            return normalize(array, ++depth);
+        } else {
+            return normalize(array);
         }
     }
 
@@ -242,6 +244,7 @@ var HugeNumber = (function () {
             if (this.array[0] === -Infinity || Number.isNaN(this.array[0])) {
                 this.sign = 1;
             }
+            // normalizeDepth = 0;
         }
 
         clone() {
