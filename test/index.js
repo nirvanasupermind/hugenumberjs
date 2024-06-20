@@ -1,5 +1,5 @@
 var HugeNumber = require("../HugeNumber.js");
-console.log(new HugeNumber(1, [10]).arrow10(new HugeNumber(1, [2,1e+10])).toString());
+console.log(new HugeNumber(1, [10,2]).log().toString());
 // function normalize(array, depth = 0) {
 //     if(typeof array === "number") {
 //         return array;
