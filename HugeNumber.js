@@ -98,6 +98,17 @@ var HugeNumber = (function () {
             return arrayString(array[0]) + "[" + array.slice(2).map(arrayString).join(",") + "]" + arrayString(array[1]);
         }
     }
+
+    function deHugeify(array) {
+        if(typeof array === "number") {
+            return array;
+        } else if(array instanceof HugeNumber) {
+            return array.array;
+        } else {
+            return array.map(deHugeify);
+        }
+    }
+
     class HugeNumber {
         constructor(sign, array) {
             this.sign = sign;
@@ -237,6 +248,7 @@ var HugeNumber = (function () {
 
             return new HugeNumber(this.sign * other.sign, [this.array, other.array, 2]);
         }
+        
 
         arrow(other, arrows) {
             if(typeof other === "number") {
@@ -250,6 +262,18 @@ var HugeNumber = (function () {
             return new HugeNumber(this.sign * other.sign, [this.array, other.array, arrows.array]);
         }
     
+        phenol(other, array) {
+            if(typeof other === "number") {
+                other = HugeNumber.from(other);
+            }
+
+            if(array instanceof Array) {
+            return new HugeNumber(1, deHugeify([this, other, ...array]));
+            } else {
+                return new HugeNumber(1, deHugeify([this, other, array]));
+            }
+        }
+
         cmp(other) {
             if (this.sign === -1 && other.sign === -1) {
                 return -this.abs().cmp(other.abs());
