@@ -1,133 +1,105 @@
 var HugeNumber = (function () {
-    const MAX_DEPTH = 10;
-    const SCI_PREC = 15;
-    
-    function arrow(a, x, y) {
-        if (x <= 1 || y === 1) {
-            return Math.pow(a, x);
-        } else {
-            var result = arrow(a, x % 1, y);
-            for(var i = 0; i < Math.floor(x); i++) {
-                result = arrow(a, result, y - 1);
-            }
-            return result;
-        }
+    const MAX_DEPTH = 500;
+    const SCI_PREC = 16;
+    const TEN_TO_SCI_PREC = 1e+16;
+
+    function log10ToSci(log10) {
+        return [Math.round(Math.pow(10, log10 % 1 + SCI_PREC)), [10, Math.floor(log10) - SCI_PREC, 1]];
     }
 
-    function gcd(a, b) {
-        if(b === 0) {
-            return a;
-        } else {
-            return gcd(b, a % b);
-        }
-    }
     function isSci(array) {
         return array.length === 2 && typeof array[0] === "number"
             && array[1].length === 3
-            && array[1][0] === 10 && typeof array[1][1] === "number"
-            && array[1][2] === 1;
+            & array[1][0] === 10 && typeof array[1][1] === "number" && array[1][2] === 1;
     }
-    
+
     function normalize(array, depth = 0) {
-        if (depth > MAX_DEPTH || typeof array === "number") {
+        if (typeof array === "number") {
             return array;
         }
-        var a = array[0];
-        var b = array[1];
-        var c = array[2];
-        if (a === 2 && b === 2) {
-            return 4;
-        } else if(isSci(array)) {
-            var num = array[0] * Math.pow(10, array[1][1]);
-            if(Number.isFinite(num) ){
-                return num;
-            }
-            
-            var result = [...array];
-            var oldMantissa = result[0];
-            result[0] = Math.floor(Math.pow(10, Math.log10(oldMantissa) % 1 + SCI_PREC));
-            result[1][1] -= Math.log10(result[0]/oldMantissa);
-            return result;
-        } else if (array.length === 2) {
-            var lhs = normalize(a, depth + 1);
-            var rhs = normalize(b, depth + 1);
-            // if (isSci(lhs) && isSci(rhs)) {
-            //     return [(lhs[0] * rhs[0]) / Math.pow(10, SCI_PREC), [10, lhs[1][1] + rhs[1][1] + SCI_PREC, 1]];
-            // } else if(typeof lhs === "number") {
-            //     return [lhs, rhs];
-            // } else {
-            //     return [lhs, rhs].sort();
-            // }
 
-            if (Number.isFinite(lhs * rhs)) {
-                return lhs * rhs;
-            } else if (isSci(lhs) && typeof rhs == "number") {
-                var floorLog = Math.floor(Math.log10(rhs));
-                return normalize([(lhs[0] * rhs) / Math.pow(10, floorLog), [10, lhs[1][1] + floorLog, 1]], depth + 1);
-            } else if (typeof lhs === "number" && isSci(rhs)) {
-                var floorLog = Math.floor(Math.log10(lhs));
-                return [(rhs[0] * lhs) / Math.pow(10, floorLog), [10, rhs[1][1] + floorLog, 1]];
-            } else if (isSci(lhs) && isSci(rhs)) {
-                return normalize([(lhs[0] * rhs[0]) / Math.pow(10, SCI_PREC), [10, lhs[1][1] + rhs[1][1] + SCI_PREC, 1]], depth + 1);
-            } else if(typeof lhs === "number") {
-                return normalize([lhs, rhs], depth + 1);
+        if(!isSci(array)) {
+        array = array.map((e) => normalize(e, depth + 1));
+        }
+
+        var temp = Math.pow(array[0], array[1]);
+        if (depth > MAX_DEPTH) {
+            return array;
+        } else if (array.length === 2 && typeof array[0] === "number" && typeof array[1] === "number") {
+            var result =  array[0] * array[1];;
+            if(Number.isFinite(result)) {
+                return result;
             } else {
-                return normalize([lhs, rhs].sort(), depth + 1);
+                return log10ToSci(Math.log10(array[0]) + Math.log10(array[1]));
             }
-        } else if (array.length === 3 && typeof a === "number" && typeof b === "number" && c === 1) {
-            var num = Math.pow(a, b);
-            if (Number.isFinite(num)) {
-                return num;
-            } else {
-                var fracExp = b * Math.log10(a);
-                var mantissa = Math.floor(Math.pow(10, (fracExp % 1) + SCI_PREC));
-                var exponent = Math.floor(fracExp) - SCI_PREC;
-                return [mantissa, [10, exponent, 1]];
+        } else if (array.length === 2 && typeof array[0] === "number" && isSci(array[1])) {
+            var log10 = Math.log10(array[0]) + Math.log10(array[1][0]) +  array[1][1][1];
+            return log10ToSci(log10);
+        } else if (array.length === 2 && isSci(array[0]) && typeof array[1] === "number") {
+            var log10 = Math.log10(array[1]) + Math.log10(array[0][0]) +  array[0][1][1];
+            return log10ToSci(log10);
+        } else if (array.length === 2 && isSci(array[0]) && isSci(array[1])) {
+            var log10 = Math.log10(array[0][0]) + Math.log10(array[1][0]) + array[0][1][1] + array[1][1][1];
+            return log10ToSci(log10);
+        } else if (isSci(array)) {
+            var newArray = [...array];
+
+            while(newArray[0] >= (TEN_TO_SCI_PREC * 10)) {
+                newArray[0] /= 10;
+                newArray[1][1]++;
             }
-        } else if (array[array.length - 1] === 0) {
+
+            while(newArray[0] < TEN_TO_SCI_PREC) {
+                newArray[0] *= 10;
+                newArray[1][1]--;
+            }
+
+            return newArray;
+        } else if (array.length === 3 && typeof array[0] === "number" && typeof array[1] === "number" && array[2] === 1 && Number.isFinite(temp)) {
+            return temp;
+        } else if (array.length === 3 && typeof array[0] === "number" && typeof array[1] === "number" && array[2] === 1 && !Number.isFinite(temp)) {
+            var log = array[1] * Math.log10(array[0]);
+            return [Math.round(Math.pow(10, (log % 1) + SCI_PREC)), [10, Math.floor(log - SCI_PREC), 1]];
+        } else if (array[array.length - 1] == 0) {
             return normalize(array.slice(0, -1), depth + 1);
-        } else if (b === 1) {
-            return a;
-        } else if (b === 0 && c > 0) {
+        } else if (array[1] === 1) {
+            return array[0];
+        } else if (array[1] === 0 && array[2] > 0) {
             return 1;
-        } else if (b === 0 && c === 0) {
+        } else if (array[1] === 0 && array[2] === 0) {
             return 0;
-        } else if (b > 1 && c > 0) {
-            var pound = array.slice(3);
-            var innerArray = normalize([a, b - 1, c, ...pound], depth + 1);
-            return normalize([a, innerArray, c - 1, ...pound], depth + 1);
+        } else if (array[1] > 1 && array[1] <= 4 && array[2] > 0 && typeof array[2] === "number") {
+            var innerArray = normalize([array[0], array[1] - 1, ...array.slice(2)], depth + 1);
+            var outerArray = [array[0], innerArray, array[2] - 1, ...array.slice(3)];
+            return normalize(outerArray, depth + 1);
+        } else if (array[1] > 4 && (array[2] > 0 || typeof array[2] !== "number")) {
+            return array;
         } else {
-            for (var i = 3; i < array.length; i++) {
-                if (array[i] != 0) {
-                    var n = array[i];
-                    var result = [a, a, ...array.slice(2, i - 1), b, n - 1];
-                    console.log(array);
-                    console.log(result);
-                    return normalize(result, depth + 1);
+            var newArray = [...array];
+            for (var i = 2; i < array.length; i++) {
+                if (array[i] !== 0) {
+                    newArray[1] = array[0];
+                    newArray[i] = array[i] - 1;
+                    newArray[i - 1] = array[1];
+                    break;
                 }
             }
-            
-            return array.map((e) => normalize(e, depth + 1));
+            return normalize(newArray, depth + 1);
         }
     }
 
-    function arrayString(array) {
+    function arrayToString(array) {
         if(typeof array === "number") {
             return array.toString();
         } else if(isSci(array)) {
-            return (array[0] / Math.pow(10, SCI_PREC)) + "e+" + (array[1][1] + SCI_PREC);
+            return (array[0] / TEN_TO_SCI_PREC) + "e+" + (array[1][1] + SCI_PREC);
+        } else if(array.length === 2) {
+            return arrayToString(array[0]) + "*" + arrayToString(array[1]);
+        } else if(array.length === 3 && array[2] === 1) {
+            return arrayToString(array[0]) + "^" + arrayToString(array[1]);
         } else {
-            return arrayString(array[0]) + "[" + array.slice(2).map(arrayString).join(",") + "]" + arrayString(array[1]);
-        }
-    }
-
-    function deHugeify(array) {
-        if(typeof array === "number") {
-            return array;
-        } else if(array instanceof HugeNumber) {
-            return array.array;
-        } else {
-            return array.map(deHugeify);
+            var inner = array.slice(2).map(arrayToString).join(",");
+            return arrayToString(array[0]) + "[" + inner + "]" + arrayToString(array[1]);
         }
     }
 
@@ -135,14 +107,19 @@ var HugeNumber = (function () {
         constructor(sign, array) {
             this.sign = sign;
             this.array = normalize(array);
-         }
+        }
 
         clone() {
-            if(typeof this.array === "number") {
-                return new HugeNumber(this.sign, this.array);
+            return new HugeNumber(this.sign, [...this.array]);
+        }
+
+        toString() {
+            if(this.sign === -1) {
+                return "-" + this.abs().toString();
             } else {
-                return new HugeNumber(this.sign, [...this.array]);
+                return arrayToString(this.array);   
             }
+             
         }
 
         abs() {
@@ -152,310 +129,46 @@ var HugeNumber = (function () {
         neg() {
             return new HugeNumber(-this.sign, this.array);
         }
-        
-        add(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.fromNumber(other);
-            }
 
-
-            if(this.sign === -1 && other.sign === -1) {
-                return this.abs().add(other.abs()).neg();
-            } else if(this.sign === -1 && other.sign === 1) {
-                return other.sub(this.abs());           
-            } else if(this.sign === 1 && other.sign === -1) {
-                return this.sub(other.abs());
-            }
-            
-            var num = this.array + other.array;
-
-            if (Number.isFinite(num)) {
-                return new HugeNumber(1, num);
-            } else if(this.lt(other)) {
-                return other.add(this);
-            } else if (isSci(this.array) && typeof other.array === "number") {
-                var log10Other = Math.log10(other.array);
-                var otherExponent = Math.floor(log10Other) - SCI_PREC;
-                var otherMantissa = Math.floor(Math.pow(10, log10Other % 1) * Math.pow(10, SCI_PREC));
-                var mantissa = Math.floor(this.array[0] + otherMantissa * Math.pow(10, otherExponent - this.array[1][1]));
-                return new HugeNumber(1, [mantissa, this.array[1]]);
-            } else if (isSci(this.array) && isSci(other.array)) {
-                var mantissa = Math.floor(this.array[0] + other.array[0] * Math.pow(10, other.array[1][1] - this.array[1][1]));
-                return new HugeNumber(1, [mantissa, this.array[1]]);
-            } else {
-                return this.clone();
-            }
-        }
-
-        sub(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-            
-            if(this.sign === -1 && other.sign === -1) {
-                return this.abs().sub(other.abs()).neg();
-            } else if(this.sign === -1 && other.sign === 1) {
-                return other.add(this.abs());           
-            } else if(this.sign === 1 && other.sign === -1) {
-                return this.sub(other.abs());
-            }
-            
-            var num = this.array - other.array;
-
-            if (Number.isFinite(num)) {
-                return new HugeNumber(1, num);
-            } else if(this.lt(other)) {
-                return other.sub(this).neg();
-            } else if (isSci(this.array) && typeof other.array === "number") {
-                var log10Other = Math.log10(other.array);
-                var otherExponent = Math.floor(log10Other) - SCI_PREC;
-                var otherMantissa = Math.floor(Math.pow(10, log10Other % 1) * Math.pow(10, SCI_PREC));
-                var mantissa = Math.floor(this.array[0] - otherMantissa * Math.pow(10, otherExponent - this.array[1][1]));
-                return new HugeNumber(1, [mantissa, this.array[1]]);
-            } else if (isSci(this.array) && isSci(other.array)) {
-                var mantissa = Math.floor(this.array[0] - other.array[0] * Math.pow(10, other.array[1][1] - this.array[1][1]));
-                return new HugeNumber(1, [mantissa, this.array[1]]);
-            } else {
-                return this.clone();
-            }
-        }
-
-        mul(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            return new HugeNumber(this.sign * other.sign, [this.array, other.array]);
-        }
-
-        div(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            var sign = this.sign * other.sign;
-        
-            var num = Math.floor(this.array / other.array);
-
-            if (Number.isFinite(num)) {
-                return new HugeNumber(sign, num);
-            } else if(this.lt(other)) {
-                return new HugeNumber(1, 0);
-            } else if (isSci(this.array) && typeof other.array === "number") {
-                var log10Other = Math.log10(other.array);
-                var otherExponent = Math.floor(log10Other) - SCI_PREC ;
-                var otherMantissa = Math.floor(Math.pow(10, log10Other - otherExponent));
-                var mantissa = Math.floor((this.array[0] / otherMantissa) * Math.pow(10, SCI_PREC + 1));
-                return new HugeNumber(1, [mantissa, [10, this.array[1][1] - otherExponent - SCI_PREC - 1, 1]]);
-            } else if (isSci(this.array) && isSci(other.array)) {
-                var mantissa = Math.floor(this.array[0] / other.array[0] * Math.pow(10, SCI_PREC + 1));
-                return new HugeNumber(1, [mantissa, [10, this.array[1][1] - other.array[1][1] - SCI_PREC - 1, 1]]);
-            } else {
-                return this.clone();
-            }
-        }
-
-        mod(other) {
-            if(this.sign === -1) {
-                return this.abs().mod(other).neg();
-            } else {
-                return this.sub(this.div(other).mul(other));
-            }
-        }
-
-        pow(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            // if(other.lt(0)) {
-            //     return HugeNumber.from(0);
-            // }
-
-            return new HugeNumber(this.sign, [this.array, other.array, 1]);
-        }
-
-        nthRoot(n) {
-            if(typeof n === "number") {
-                n = HugeNumber.from(n);
-            }
-
-            var num = n.toNumber();
-
-            if(num === Infinity || num === -Infinity) {
-                return HugeNumber.from(1);
-            } if(Number.isFinite(this.array)) {
-                return HugeNumber.from(Math.floor(Math.pow(this.array, 1/num)));
-            } else if(isSci(this.array)) {
-                var mantissa = this.array[0] * Math.pow(10, (this.array[1][1] + SCI_PREC) % num - SCI_PREC);
-                mantissa = Math.pow(mantissa, 1/num);
-                var exponent = Math.floor((this.array[1][1] + SCI_PREC) / num);
-                return new HugeNumber(1, [mantissa, [10, exponent, 1]]);
-            } else {
-                return new HugeNumber(1, [mantissa, [10, exponent, 1]]);
-            }
-        }
-
-        tetr(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            return new HugeNumber(this.sign, [this.array, other.array, 2]);
-        }
-        
-
-        arrow(other, arrows) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            if(typeof arrows === "number") {
-                arrows = HugeNumber.from(arrows);
-            }
-
-            return new HugeNumber(this.sign, [this.array, other.array, arrows.array]);
-        }
-    
-        phenol(other, array) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            if(array instanceof Array) {
-            return new HugeNumber(1, deHugeify([this, other, ...array]));
-            } else {
-                return new HugeNumber(1, deHugeify([this, other, array]));
-            }
-        }
-
-        and(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            var num = this.array & other.array;
-            if(Number.isFinite(num) && this.array < 2147483648 && other.array < 2147483648) {
-                return HugeNumber.from(num);
-            } else {
-                return this.max(other);
-            }
-        }
-
-        or(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            var num = this.array | other.array;
-            if(Number.isFinite(num) && this.array < 2147483648 && other.array < 2147483648) {
-                return HugeNumber.from(num);
-            } else {
-                return this.max(other);
-            }
-        }
-
-        xor(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            var num = this.array ^ other.array;
-            if(Number.isFinite(num) && this.array < 2147483648 && other.array < 2147483648) {
-                return HugeNumber.from(num);
-            } else {
-                return this.max(other);
-            }
-        }
-
-        lsh(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-            
-            var temp = this.array << other.array;
-            if(Number.isFinite(temp) && this.array < 65536 && other.array < 14) {
-                return temp;
-            } else {
-                return this.mul(HugeNumber.from(2).pow(other));
-            }
-        }
-    
-
-        rsh(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-                        
-            var temp = this.array >> other.array;
-            if(Number.isFinite(temp) && this.array < 1073741824 && other.array < 32) {
-                return temp;
-            } else {
-                return this.div(HugeNumber.from(2).pow(other));
-            }
-        } 
-
-        gcd(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
-            if(Number.isFinite(this.array) && Number.isFinite(other.array)) {
-                return gcd(this.array, other.array);;
-            } else {
-                return HugeNumber.from(NaN);
-            }
+        negAbs() {
+            return new HugeNumber(-1, this.array);
         }
 
         cmp(other) {
-            if(typeof other === "number") {
-                other = HugeNumber.from(other);
-            }
-
             if (this.sign === -1 && other.sign === -1) {
                 return -this.abs().cmp(other.abs());
             } else if (this.sign === -1 && other.sign === 1) {
                 return -1;
             } else if (this.sign === 1 && other.sign === -1) {
                 return 1;
-            } if (typeof this.array === "number" && typeof other.array === "number") {
-                if (this.array > other.array) {
-                    return 1;
-                } else if (this.array === other.array) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            } else if ((typeof this.array === "number" && typeof other.array !== "number")
-                || (this.array.length > other.array.length)) {
+            } else if (this.array < other.array) {
                 return -1;
-            } else if ((typeof this.array !== "number" && typeof other.array === "number")
-                || (this.array.length < other.array.length)) {
+            } else if (this.array === other.array) {
+                return 0;
+            } else if (this.array > other.array) {
                 return 1;
             } else {
                 for (var i = this.array.length - 1; i >= 0; i--) {
                     var a = new HugeNumber(1, this.array[i]);
                     var b = new HugeNumber(1, other.array[i]);
-                    if (a.cmp(b) === 1) {
+                    if (a.gt(b)) {
                         return 1;
-                    } else if (a.cmp(b) === -1) {
+                    } else if(a.lt(b)) {
                         return -1;
                     }
                 }
-
                 return 0;
             }
         }
-        
+
         eq(other) {
             return this.cmp(other) === 0;
         }
-        
+
         ne(other) {
             return this.cmp(other) !== 0;
         }
-
+    
         lt(other) {
             return this.cmp(other) < 0;
         }
@@ -472,30 +185,70 @@ var HugeNumber = (function () {
             return this.cmp(other) >= 0;
         }
 
+        min(other) {
+            return this.lt(other) ? this.clone() : other.clone();
+        }
+
         max(other) {
             return this.gt(other) ? this.clone() : other.clone();
         }
-
-        toNumber() {
-            if(typeof this.array === "number") {
-                return this.sign * this.array;
+        
+        add(other) {
+            if (this.lt(other)) {
+                return other.add(this);
+            } else if (this.sign === -1 && other.sign === -1) {
+                return this.abs().add(other.abs()).negAbs();
+            } else if (this.sign === 1 && this.sign === -1) {
+                return this.sub(other.abs());
+            } else if (typeof this.array === "number" && typeof other.array === "number") {
+                return new HugeNumber(1, this.array + other.array);
+            } else if (isSci(this.array) && typeof other.array === "number") {
+                return new HugeNumber(1, [this.array[0] + other.array * Math.pow(10, -this.array[1][1]), [10, this.array[1][1], 1]]);
+            } else if (isSci(this.array) && isSci(other.array)) {
+                return new HugeNumber(1, [this.array[0] + other.array[0] * Math.pow(10, other.array[1][1] - this.array[1][1]), [10, this.array[1][1], 1]]);
             } else {
-                return this.sign * Infinity;
+                return this.clone();
             }
         }
 
-        toString() {
-            if(this.sign === -1) {
-                return "-" + this.abs().toString();
+        sub(other) {
+            if (this.lt(other)) {
+                return other.sub(this).neg();
+            } else if(this.eq(other)) {
+                return new HugeNumber(1, 0);
+            } else if (this.sign === -1 && other.sign === -1) {
+                return this.abs().sub(other.abs()).negAbs();
+            } else if (this.sign === 1 && this.sign === -1) {
+                return this.add(other.abs());
+            } else if (typeof this.array === "number" && typeof other.array === "number") {
+                return new HugeNumber(1, this.array - other.array);
+            } else if (isSci(this.array) && typeof other.array === "number") {
+                return log10ToSci(Math.log10(this.array[0]) + this.array[1][1] + Math.log10(other.array));
+            } else if (isSci(this.array) && isSci(other.array)) {
+                return new HugeNumber(1, [Math.log10(this.array[0]) + this.array[1][1] + Math.log10(other.array[0]) + Math.log10(other.array[1][1])]);
+            } else {
+                return this.clone();
             }
-            return arrayString(this.array);
+        }
+
+        mul(other) {
+            return new HugeNumber(this.sign * other.sign, [this.array[0], other.array[0]]);
+        }
+
+        div(other) {
+            if(typeof this.array === "number" && typeof other.array === "number") {
+                return new HugeNumber(this.sign * other.sign, Math.floor(this.array / other.array));
+            } else if(this.lt(other)) {
+                return new HugeNumber(1, 0);
+            } else if(this.eq(other)) {
+                return new HugeNumber(1, 1);
+            } else if(isSci(this.array) && typeof other.array === "number") {
+                return new HugeNumber(1, log10ToSci(Math.log10(this.array[0]) + this.array[1][1] - Math.log10(other.array)));
+            } else if(isSci(this.array) && isSci(other.array)) {
+                return new HugeNumber(1, log10ToSci(Math.log10(this.array[0]) + this.array[1][1] - Math.log10(other.array[0]) - other.array[1][1]));
+            }
         }
         
-        static from(val) {
-            if(typeof val === "number") {
-                return new HugeNumber(val < 0 ? -1 : 1, Math.abs(val));
-            }
-        }
     }
 
     return HugeNumber;
