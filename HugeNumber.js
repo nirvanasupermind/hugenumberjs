@@ -13,6 +13,13 @@ var HugeNumber = (function () {
     //         & array[1][0] === 10 && typeof array[1][1] === "number" && array[1][2] === 1;
     // }
 
+    function is10ToX(array) {
+        return typeof array[0] === "number" && array[1] === 1 && array[2] === 0;
+    }
+
+    function is10To10ToX(array) {
+        return is10ToX(array[0]) && array[1] === 1 && array[2] === 0;
+    }
 
     function phenolInterpolate(x, y, n, depth) {
         if (typeof x === "number" && typeof y === "number") {
@@ -176,14 +183,13 @@ var HugeNumber = (function () {
                 return this.sub(other.abs());
             } else if (typeof this.array === "number" && typeof other.array === "number") {
                 return new HugeNumber(1, this.array + other.array);
-            } else if (typeof this.array[0] === "number" && this.array[1] === 1 && this.array[2] === 0 
-                && typeof other.array === "number") {
+            } else if (is10ToX(array)  && typeof other.array === "number") {
                 var gaussianLog = Math.log10(1 + Math.pow(10, Math.log10(other.array) - this.array[0]));
                 return new HugeNumber(1, [this.array[0] + gaussianLog, 1, 0]);
-            }  else if (typeof this.array[0] === "number" && this.array[1] === 1 && this.array[2] === 0 
-                && typeof other.array[0] === "number" && other.array[1] === 1 && other.array[2] === 0) {
-                var gaussianLog = Math.log10(1 + Math.pow(10, other.array[0] - this.array[0]));
+            }  else if (is10ToX(array) && is10ToX(other.array)) {
                 return new HugeNumber(1, [this.array[0] + gaussianLog, 1, 0]);
+            } else {
+                return this.max(other);
             }
         }
 
@@ -199,20 +205,63 @@ var HugeNumber = (function () {
                 return this.add(other.abs());
             } else if (typeof this.array === "number" && typeof other.array === "number") {
                 return new HugeNumber(1, this.array - other.array);
-            } else if (typeof this.array[0] === "number" && this.array[1] === 1 && this.array[2] === 0 
-                && typeof other.array === "number") {
+            } else if (is10ToX(array)  && typeof other.array === "number") {
                 var gaussianLog = Math.log10(Math.abs(1 - Math.pow(10, Math.log10(other.array) - this.array[0])));
                 return new HugeNumber(1, [this.array[0] + gaussianLog, 1, 0]);
-            } else if (typeof this.array[0] === "number" && this.array[1] === 1 && this.array[2] === 0 
-                && typeof other.array[0] === "number" && other.array[1] === 1 && other.array[2] === 0) {
+            } else if (is10ToX(array) && is10ToX(other.array)) {
                 var gaussianLog = Math.log10(Math.abs(1 - Math.pow(10, other.array[0] - this.array[0])));
                 return new HugeNumber(1, [this.array[0] + gaussianLog, 1, 0]);
+            } else {
+                return this.max(other);
             }
         }
         
         mul(other) {
-            
+            if(this.lt(other)) {
+                return other.mul(this);
+            }
+
+            var sign = this.sign * other.sign;
+            if(typeof this.array === "number" && typeof other.array === "number") {
+                return new HugeNumber(sign, this.array * other.array);
+            } else if(is10ToX(this.array) && typeof other.array === "number") {
+                return new HugeNumber(sign, [this.array[0] + Math.log10(other.array), 1, 0]);
+            } else if(is10ToX(this.array) && is10ToX(other.array)) {
+                return new HugeNumber(sign, [this.array[0] + other.array[0], 1, 0]);
+            } else if(is10To10ToX(this.array) && is10ToX(other.array)) {
+                var gaussianLog = Math.log10(1 + Math.pow(10, Math.log10(other.array[0]) - this.array[0][0]));
+                return new HugeNumber(1, [[this.array[0][0] + gaussianLog, 1, 0], 1, 0]);
+            } else if(is10To10ToX(this.array) && is10To10ToX(other.array)) {
+                var gaussianLog = Math.log10(1+ Math.pow(10, other.array[0][0] - this.array[0][0]));
+                return new HugeNumber(1, [[this.array[0][0] + gaussianLog, 1, 0], 1, 0]);
+            } else {
+                return this.clone();
+            }
         }
+        
+        div(other) {
+            if(this.lt(other)) {
+                return new HugeNumber(1, 0);
+            }
+
+            var sign = this.sign * other.sign;
+            if(typeof this.array === "number" && typeof other.array === "number") {
+                return new HugeNumber(sign, this.array / other.array);
+            } else if(is10ToX(this.array) && typeof other.array === "number") {
+                return new HugeNumber(sign, [this.array[0] - Math.log10(other.array), 1, 0]);
+            } else if(is10ToX(this.array) && is10ToX(other.array)) {
+                return new HugeNumber(sign, [this.array[0] - other.array[0], 1, 0]);
+            } else if(is10To10ToX(this.array) && is10ToX(other.array)) {
+                var gaussianLog = Math.log10(Math.abs(1 - Math.pow(10, Math.log10(other.array[0]) - this.array[0][0])));
+                return new HugeNumber(1, [[this.array[0][0] + gaussianLog, 1, 0], 1, 0]);
+            } else if(is10To10ToX(this.array) && is10To10ToX(other.array)) {
+                var gaussianLog = Math.log10(Math.abs(1 - Math.pow(10, other.array[0][0] - this.array[0][0])));
+                return new HugeNumber(1, [[this.array[0][0] + gaussianLog, 1, 0], 1, 0]);
+            } else {
+                return this.clone();
+            }
+        }
+        
 
         // sub(other) {
         //     if (this.lt(other)) {
