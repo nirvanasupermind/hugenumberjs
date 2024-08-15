@@ -67,7 +67,6 @@ var HugeNumber = (function () {
             }
             result += inverseArrow(a, x, y - 1);
             return result;
-            
         }
     }
 
@@ -162,16 +161,20 @@ var HugeNumber = (function () {
     }
 
     class HugeNumber {
-        constructor(sign, array) {
-            this.sign = sign;
+        constructor(array, sign) {
             this.array = normalize(array);
+            this.sign = sign;
+            if(this.array < 0) {
+                this.array *= -1;
+                this.sign *= -1;
+            }
         }
 
         clone() {
             if(typeof this.array === "number") {
-                return new HugeNumber(this.sign, this.array);
+                return new HugeNumber(this.array, this.sign);
             } else {
-                return new HugeNumber(this.sign, [...this.array]);
+                return new HugeNumber([...this.array], this.sign);
             }
         }
 
@@ -181,7 +184,6 @@ var HugeNumber = (function () {
             } else {
                 return arrayToString(this.array);
             }
-
         }
 
         abs() {
@@ -278,7 +280,7 @@ var HugeNumber = (function () {
                 return this.sub(other.abs());
             } else if (typeof this.array === "number" && typeof other.array === "number") {
                 return new HugeNumber(1, this.array + other.array);
-            } else if (is10ToX(this.array) && typeof other.array === "number") {
+            } else if (is0ToX(this.array) && typeof other.array === "number") {
                 var gaussianLog = Math.log10(1 + Math.pow(10, Math.log10(other.array) - this.array[0]));
                 return new HugeNumber(1, [this.array[0] + gaussianLog, 1, 1]);
             } else if (is10ToX(this.array) && is10ToX(other.array)) {
@@ -585,8 +587,11 @@ var HugeNumber = (function () {
                 return this.clone();
             } else if(d.gt(1) && d.lt(2)) {
                 return this.pow(b).pow(new HugeNumber(1, 2).sub(d));
-            }
-
+            } else if(b.ge(1) && b.lt(2) && d.ge(2)) {
+                return this.pow(b - 1);
+            } else if(b.ge(1) && b.lt(2) && d.ge(2)) {
+                return this.pow(b - 1);
+            } 
             
         }
 
