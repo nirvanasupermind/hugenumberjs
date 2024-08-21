@@ -167,12 +167,12 @@ var HugeNumber = (function () {
                 if (ord[i][1] === 0) {
                     result += ord[i][0] + "+";
                 } else if (ord[i][1] === 1) {
-                    result += coef + "ω+";
+                    result += coef + "w+";
                 } else {
                     if ((typeof ord[i][1] === "number") || (ord[i][1].length === 1 && ord[i][1][0][1] === 1)) {
-                        result += coef + "ω^" + exp + "+";
+                        result += coef + "w^" + exp + "+";
                     } else {
-                        result += coef + "ω^(" + exp + ")+";
+                        result += coef + "w^(" + exp + ")+";
                     }
                 }
             }
@@ -184,6 +184,44 @@ var HugeNumber = (function () {
             this.sign = sign;
             this.ord = normalizeOrd(ord);
             this.n = n;
+            if (typeof this.ord === "number") {
+                this.n += this.ord;
+                this.ord = 0;
+            } else {
+                // console.log(this.ord);
+                var constTerm = this.ord.filter((e) => e[1] === 0)[0];
+                var omegaTerm = this.ord.filter((e) => e[1] === 1)[0];
+
+                if (!constTerm && omegaTerm) {
+                    this.ord = this.ord.filter((e) => e[1] !== 1);
+                    this.n *= Math.pow(2, omegaTerm[0]);
+                } else if (constTerm && omegaTerm) {
+                    this.ord = this.ord.filter((e) => e[1] >= 2);
+                    this.n += constTerm[0];
+                    this.n *= Math.pow(2, omegaTerm[0]);
+                }
+
+                if (jsonEq(this.ord, [[1, 2]]) && this.n < 1014.00984251968) {
+                    this.ord = 0;
+                    this.n = hOmegaSquared(this.n);
+                }
+            }
+        }
+
+        clone() {
+            return new HugeNumber(this.sign, [...this.ord], this.n);
+        }
+
+        abs() {
+            return new HugeNumber(1, [...this.ord], this.n);
+        }
+
+        neg() {
+            return new HugeNumber(-this.sign, [...this.ord], this.n);
+        }
+
+        negAbs() {
+            return new HugeNumber(-1, [...this.ord], this.n);
         }
 
         cmp(other) {
@@ -238,13 +276,16 @@ var HugeNumber = (function () {
                 return this.sub(other.negAbs());
             } else if (this.ord === 0 && other.ord === 0) {
                 return new HugeNumber(1, 0, this.n + other.n);
-            } else if(this.ord === 1 && (other.ord === 0 || other.ord === 1)) {
-                var y = other.n === 0 ? Math.log10(other.n) : other.n;
-                var gaussianLog = Math.log10(1 + Math.pow(10, y - this.n));
-                return new HugeNumber(1, 1, this.n + gaussianLog);
+            } else if (jsonEq(this.ord, [[1, 2]]) && other.ord === 0) {
+                var [s, e] = hOmegaSquaredToSci(this.n);
+                return new HugeNumber(1, [[1, 2]], sciToHOmegaSquared(s + other.n * Math.pow(10, -e), e));
+            } else if (jsonEq(this.ord, [[1, 2]]) && jsonEq(other.ord, [[1, 2]])) {
+                var [s1, e1] = hOmegaSquaredToSci(this.n);
+                var [s2, e2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(1, [[1, 2]], sciToHOmegaSquared(s1 + s2 * Math.pow(10, e1 - e2), e1));
             } else {
-                return this.max(other);
-            }          
+                return this.clone();
+            }
         }
 
         sub(other) {
@@ -256,35 +297,83 @@ var HugeNumber = (function () {
                 return this.add(other.negAbs());
             } else if (this.ord === 0 && other.ord === 0) {
                 return new HugeNumber(1, 0, this.n - other.n);
-            } else if(this.ord === 1 && (other.ord === 0 || other.ord === 1)) {
-                var y = other.n === 0 ? Math.log10(other.n) : other.n;
-                var gaussianLog = Math.log10(Math.abs(1 - Math.pow(10, y - this.n)));
-                return new HugeNumber(1, 1, this.n + gaussianLog);
+            } else if (jsonEq(this.ord, [[1, 2]]) && other.ord === 0) {
+                var [s, e] = hOmegaSquaredToSci(this.n);
+                return new HugeNumber(1, [[1, 2]], sciToHOmegaSquared(s - other.n * Math.pow(10, -e), e));
+            } else if (jsonEq(this.ord, [[1, 2]]) && jsonEq(other.ord, [[1, 2]])) {
+                var [s1, e1] = hOmegaSquaredToSci(this.n);
+                var [s2, e2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(1, [[1, 2]], sciToHOmegaSquared(s1 + s2 * Math.pow(10, e1 - e2), e1));
             } else {
-                return this.max(other);
-            }     
+                return this.clone();
+            }
         }
-     
+
         mul(other) {
             var sign = this.sign * other.sign;
             if (this.lt(other)) {
                 return other.mul(this);
             } else if (this.ord === 0 && other.ord === 0) {
-                return new HugeNumber(1, 0, this.n * other.n);
-            } else if(this.ord === 1 && (other.ord === 0 || other.ord === 1)) {
-                return new HugeNumber(1, 0, this.n + (other.ord === 0 ? Math.log10(other.n) : other.n));
-            } else if(this.ord === 2 && (other.ord === 1 || other.ord === 2)) {
-                var y = other.n === 0 ? Math.log10(other.n) : other.n;
-                var gaussianLog = Math.log10(1 + Math.pow(10, y - this.n));
-                return new HugeNumber(1, 2, this.n + gaussianLog);
+                return new HugeNumber(sign, 0, this.n * other.n);
+            } else if (jsonEq(this.ord, [[1, 2]]) && other.ord === 0) {
+                var [s, e] = hOmegaSquaredToSci(this.n);
+                return new HugeNumber(sign, [[1, 2]], sciToHOmegaSquared(s * other.n, e));
+            } else if (jsonEq(this.ord, [[1, 2]]) && jsonEq(other.ord, [[1, 2]])) {
+                var [s1, e1] = hOmegaSquaredToSci(this.n);
+                var [s2, e2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(sign, [[1, 2]], sciToHOmegaSquared(s1 * s2, e1 + e2));
+            } else if (jsonEq(this.ord, [[2, 2]]) && jsonEq(other.ord, [[1, 2]])) {
+                var [logS1, logE1] = hOmegaSquaredToSci(this.n);
+                var [s2, e2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(sign, [[2, 2]], sciToHOmegaSquared(logS1 + (e2 + Math.log10(s2)) * Math.pow(10, -logE1), logE1));
+            } else if (jsonEq(this.ord, [[2, 2]]) && jsonEq(other.ord, [[2, 2]])) {
+                var [logS1, logE1] = hOmegaSquaredToSci(this.n);
+                var [logS2, logE2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(1, [[2, 2]], sciToHOmegaSquared(logS1 + logS2 * Math.pow(10, logE1 - logE2), logE1));
             } else {
-                return this.max(other);
-            }     
+                return this.clone();
+            }
         }
-     
-        
+
+        div(other) {
+            var sign = this.sign * other.sign;
+            if (this.eq(other)) {
+                return new HugeNumber(1, 0, 1);
+            } else if (this.ord === 0 && other.ord === 0) {
+                return new HugeNumber(sign, 0, this.n / other.n);
+            } else if (jsonEq(this.ord, [[1, 2]]) && other.ord === 0) {
+                var [s, e] = hOmegaSquaredToSci(this.n);
+                return new HugeNumber(sign, [[1, 2]], sciToHOmegaSquared(s / other.n, e));
+            } else if (jsonEq(this.ord, [[1, 2]]) && jsonEq(other.ord, [[1, 2]])) {
+                var [s1, e1] = hOmegaSquaredToSci(this.n);
+                var [s2, e2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(sign, [[1, 2]], sciToHOmegaSquared(s1 / s2, e1 - e2));
+            } else if (jsonEq(this.ord, [[2, 2]]) && jsonEq(other.ord, [[1, 2]])) {
+                var [logS1, logE1] = hOmegaSquaredToSci(this.n);
+                var [s2, e2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(sign, [[2, 2]], sciToHOmegaSquared(logS1 - (e2 + Math.log10(s2)) * Math.pow(10, -logE1), logE1));
+            } else if (jsonEq(this.ord, [[2, 2]]) && jsonEq(other.ord, [[2, 2]])) {
+                var [logS1, logE1] = hOmegaSquaredToSci(this.n);
+                var [logS2, logE2] = hOmegaSquaredToSci(other.n);
+                return new HugeNumber(1, [[2, 2]], sciToHOmegaSquared(logS1 - logS2 * Math.pow(10, logE1 - logE2), logE1));
+            } else if (this.lt(other)) {
+                return new HugeNumber(1, 0, 0);xq
+            } else {
+                return this.clone();
+            }
+        }
+
         toString() {
-            return "D_" + ordToString(this.ord) + "(" + this.n + ")";
+            if (this.sign === -1) {
+                return "-" + this.negAbs().toString();
+            } else if (this.ord === 0) {
+                return this.n.toString();
+            } else if (jsonEq(this.ord, [[1, 2]])) {
+                var [s, e] = hOmegaSquaredToSci(this.n);
+                return s + "e+" + e;
+            } else {
+                return "H_" + ordToString(this.ord) + "(" + this.n + ")";
+            }
         }
     }
 
