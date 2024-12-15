@@ -1,6 +1,8 @@
 // Wrapping all code in the function
 // so I can have private variables
 var HugeNumber = (function () {
+    const ARROW_LIMITS = [2.396009145337229,1.3794884713808426,1.1397180753577167,1.0567974360219186,1.0239917509322818,1.0102964580665499,1.0044488304267691,1.0019278174114663,1.000836434476243,1.0003631070410433,1.0001576667610421,1.0000684684068455,1.0000297344333546,1.0000129133083444,1.0000056081423478,1.0000024355784451,1.0000010577569909,1.0000004593777803,1.0000001995051901,1.0000000866439955,1.0000000376290075,1.0000000163420704,1.0000000070972699,1.0000000030823064,1.0000000013386274,1.000000000581359,1.0000000002524811,1.000000000109651,1.0000000000476201,1.0000000000206821,1.0000000000089813,1.0000000000039009,1.0000000000016946,1.000000000000735,1.0000000000003197,1.0000000000001381,1.0000000000000608,1.0000000000000262,1.000000000000011,1.0000000000000062,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013];
+    // Normalizes ordinal
     function normalizeOrd(ord) {
         var result = ord.slice();
         while(result[result.length - 1] === 0) {
@@ -9,11 +11,108 @@ var HugeNumber = (function () {
         return result;
     }
 
+    function addOrd(ord1, ord2) {
+        if(ord1.length < ord2.length) {
+            return ord2;
+        }
+        var result = [];
+        for(var i = 0; i < ord1.length; i++) {
+            if(i >= ord2.length) {
+                result.push(ord1[i]);
+            } else {
+                result.push(ord1[i] + ord2[i]);
+            }
+        }
+        return normalizeOrd(result);
+    }
+
+    function getFSTerm(ord, n) {
+        if (JSON.stringify(ord) === "[0,1]") {
+            return [n];
+        } else if (ord.slice(0, -1).filter((e) => e).length === 0) {
+            return ord.slice(0, -2).concat([n, ord[ord.length - 1] - 1]);
+        } else {
+            var leadingZeros = [];
+            var i = 0;
+           while(ord[i] === 0) {
+                leadingZeros.push(0);
+                i++;
+            }
+
+            return addOrd(leadingZeros.concat([0]).concat(ord.slice(i + 1)), getFSTerm(leadingZeros.concat(ord[i]), n));
+        }
+    }
+
+    // 10-growing hierarchy
+    function tgh(alpha, n) {
+        if(alpha[0] == 0 && alpha[1] === 0) {
+            return 10 * n;
+        } else if(alpha[0] === 1) {
+            return Math.pow(10, n);
+        } else if((alpha[0] >= 2 && n >= 2.396009)
+            || (alpha >= 3 && n >= 1.3794)) {
+            return Infinity;
+        } else if(alpha[0] === 0 && alpha[1] === 1) {
+            return Math.pow(tgh([Math.floor(n)], 10), 1 - (n % 1)) * Math.pow(tgh([Math.ceil(n)], 10), (n % 1));
+        } else {
+            try {
+                if(0 <= n && n <= 1) {
+                    return Math.pow(10, n);
+                } else {
+                    var result = tgh(alpha, n % 1 + 1);
+                    for(var i = 0; i < Math.floor(n - 1); i++) {
+                        result = tgh([alpha[0] - 1, alpha.length > 1 ? alpha[1] : 0], result);
+                    }
+                    return result;
+                }
+            }
+            catch(e) {
+                return Infinity;
+            }
+        }
+    }
+
     class HugeNumber {
         constructor(sign, n, ords) {
             this.sign = sign
             this.n = n;
-            this.ords = ords.map(normalizeOrd);        
+            this.ords = ords.map(normalizeOrd);   
+            if(this.ords.length) {
+                if(this.ords[0][0] !== 0) {
+                    var i = 0;
+                    while(JSON.stringify(this.ords[i]) === JSON.stringify(this.ords[0])) {
+                        i++;
+                    }
+                    if(i === n) {
+                        this.ords = [addOrd(this.ords[0], [1])].concat(this.ords.slice(i));
+                    }
+                } else {
+                    this.ords[0] = getFSTerm(this.ords[0], Math.ceil(n));
+                }
+
+                if(this.ords[0].length <= 2) {
+                    var tghVal = tgh(this.ords[0], this.n);
+                    if(Number.isFinite(tghVal)) {
+                        this.n = tghVal;
+                        this.ords.shift();
+                    } else {
+                    while(this.n <= (this.ords[0][0] >= 50 ? 2 : ARROW_LIMITS[this.ords[0][0] - 2] + 1)) {
+                        this.n = tgh(this.ords[0], this.n - 1);
+                        this.ords[0][0]--;
+                    }
+                    var tghVal = tgh(this.ords[0], this.n);
+                    if(Number.isFinite(tghVal)) {
+                        this.n = tghVal;
+                        this.ords.shift();
+                    }
+                }
+
+
+                    // this.ords.shift();
+                }    
+            }
+
+            
         }
 
 
@@ -31,6 +130,14 @@ var HugeNumber = (function () {
 
         negAbs() {
             return new HugeNumber(-1, this.n, this.ords.slice());
+        }
+
+        add(other) {
+            return thi;
+        }
+
+        static getFSTerm(ord, n) {
+            return getFSTerm(ord, n);
         }
     }
 
