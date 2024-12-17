@@ -1,93 +1,55 @@
 // Wrapping all code in the function
 // so I can have private variables
 var HugeNumber = (function () {
-    const ARROW_LIMITS = [2.396009145337229,1.3794884713808426,1.1397180753577167,1.0567974360219186,1.0239917509322818,1.0102964580665499,1.0044488304267691,1.0019278174114663,1.000836434476243,1.0003631070410433,1.0001576667610421,1.0000684684068455,1.0000297344333546,1.0000129133083444,1.0000056081423478,1.0000024355784451,1.0000010577569909,1.0000004593777803,1.0000001995051901,1.0000000866439955,1.0000000376290075,1.0000000163420704,1.0000000070972699,1.0000000030823064,1.0000000013386274,1.000000000581359,1.0000000002524811,1.000000000109651,1.0000000000476201,1.0000000000206821,1.0000000000089813,1.0000000000039009,1.0000000000016946,1.000000000000735,1.0000000000003197,1.0000000000001381,1.0000000000000608,1.0000000000000262,1.000000000000011,1.0000000000000062,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013];
-
     function normalize(array) {
-        var b = array[0], c = array[1], d = array[2];
-        if(c === 1 && d === 1 && b < Math.log10(Number.MAX_VALUE)) {
-            return Math.pow(10, b);
-        } else if(b === 1) {
-            return 10;
-        } else if(c === 1 && 1 < d && d < 2) {
-            var t1 = normalize([b, 1, 1]);
-            var t2 = normalize([b, 1, 2]);
-            
-            if(typeof t1 === "number") {
-                t1 = [Math.log10(t1), 1, 1];
-            }
-            if(typeof t2 === "number") {
-                t2 = [Math.log10(t2), 1, 1];
-            }
-
-            if(t1[1] === 1 && t1[2] === 1 && t2[1] === 1 && t2[2] === 1) {
-                return normalize([t1[0] * (2 - d) + t2[0] * (d - 1), 1, 1]);
-            } else {
-                return normalize([b, 1, Math.ceil(d)]);
-            }
-        } else if(1 < b && b < 2 && c === 1 && d >= 2) {
-            return normalize([Math.pow(10, b - 1), 10, d - 1]);
-        } else if(b >= 2 && d >= 2) {
-            return normalize([10, normalize([b - 1, 1, d]), d - 1]);
-        } else if(1 < c && c < 2) {
-            var t1 = normalize([b, 1, d]);
-            var t2 = normalize([b, 2, d]);
-            
-            if(typeof t1 === "number") {
-                t1 = [Math.log10(t1), 1, 1];
-            }
-            if(typeof t2 === "number") {
-                t2 = [Math.log10(t2), 1, 1];
-            }
-
-            if(t1[1] === 1 && t1[2] === 1 && t2[1] === 1 && t2[2] === 1) {
-                return normalize([t1[0] * (2 - d) + t2[0] * (d - 1), 1, 1]);
-            } else {
-                return normalize([b, Math.ceil(c), d]);
-            }
-        } else if(1 < b && b < 2 && c >= 2) {
-            return normalize([Math.pow(10, b - 1), c - 1, d]);
-        } else if(b >= 2 && b < 4) {
-            var innerArray = normalize([b - 1, c, d]);
-            if(typeof innerArray === "number" || innerArray[1] < (c - 1) || innerArray[2] < d) {
-                return normalize([innerArray, c - 1, d]);                
-            } else {
-                return array;
-            }
-        } else {
+        var a = 10;
+        var b = array[0];
+        if(array.length === 1) {
             return array;
+        } else if(array[array.length - 1] === 1) {
+            return normalize(array.slice(0,-1));
+        } else if(array[3] === 1) {
+            var n = 1;
+            
         }
     }
 
     class HugeNumber {
         constructor(sign, array) {
             this.sign = sign
-            this.array = normalize(array);
+            this.array = array;
         }
 
         clone() {
-            return new HugeNumber(this.sign, this.n, this.ords.slice());
+            return new HugeNumber(this.sign, this.array.slice());
         }
 
         abs() {
-            return new HugeNumber(1, this.n, this.ords.slice());
+            return new HugeNumber(1, this.array.slice());
         }
 
         neg() {
-            return new HugeNumber(-this.sign, this.n, this.ords.slice());
+            return new HugeNumber(-this.sign,  this.array.slice());
         }
 
-        negAbs() {
-            return new HugeNumber(-1, this.n, this.ords.slice());
+        absNeg() {
+            return new HugeNumber(-1, this.array.slice());
         }
 
         add(other) {
-            return thi;
+            if(this.sign === -1 && other.sign === -1) {
+                return this.abs().add(other.abs()).absNeg();
+            } else if(this.sign === -1 && other.sign === 1) {
+                return this.abs().sub(other.absNeg()).absNeg();
+            } else if(this.sign === 1 && other.sign === -1) {
+                return this.sub(other.abs());
+            } else {
+                if(typeof this.array === "number") {
+
+                }
+            }
         }
 
-        static getFSTerm(ord, n) {
-            return getFSTerm(ord, n);
-        }
     }
 
     return HugeNumber;
