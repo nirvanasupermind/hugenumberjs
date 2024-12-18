@@ -321,15 +321,15 @@ var HugeNumber = (function () {
             }
         }
 
-            // Modulo
-            mod(other) {
-                if (typeof other === "number") {
-                    other = HugeNumber.fromNumber(other);
-                }
-    
-                // Use property that x % y = x - (floor(x / y) * y)
-                return this.abs().sub(this.abs().div(other).floor().mul(other));
+        // Modulo
+        mod(other) {
+            if (typeof other === "number") {
+                other = HugeNumber.fromNumber(other);
             }
+
+            // Use property that x % y = x - (floor(x / y) * y)
+            return this.abs().sub(this.abs().div(other).floor().mul(other));
+        }
         
 
         floor() {
