@@ -1,54 +1,273 @@
 // Wrapping all code in the function
 // so I can have private variables
 var HugeNumber = (function () {
-    function normalize(array) {
+    const LOG10_MAX_VALUE = 308.25471555991675;
+    // returns log10(10^x + 10^y)
+    function addLogs(x, y) {
+        var gaussianLog = Math.log10(1 + Math.pow(10, y - x));
+        if(Number.isFinite(gaussianLog)) {
+            return x + gaussianLog;
+        } else {
+            return y;
+        }
+    }
+    
+    // returns log10(10^x - 10^y)
+    function subLogs(x, y) {
+        var gaussianLog = Math.log10(Math.abs(1 - Math.pow(10, y - x)));
+        if(Number.isFinite(gaussianLog)) {
+            return x + gaussianLog;
+        } else {
+            return y;
+        }
+    }
+    
+    
+    // Normalizes an array in my continuous extension of linear BAN
+    // (the first term is implicit 10, so {10,100,1,2} -> [100,1,2])
+    function normalize(array, outputVanillaNumbers = true) {
         var a = 10;
         var b = array[0];
-        if(array.length === 1) {
-            return array;
+        var c = array[1];
+        if(array.length === 0) {
+            // Rule 2
+            // {a} = a
+            return 10;
+        } else if(array.length === 1) {
+            // Rule 3
+            // {a, b} = a^b
+            if(b < LOG10_MAX_VALUE && outputVanillaNumbers) {
+                return Math.pow(a, b);
+            } else {
+                return array;
+            }
         } else if(array[array.length - 1] === 1) {
+            // Rule 4
+            // {#, 1} = {#}
             return normalize(array.slice(0,-1));
-        } else if(array[3] === 1) {
+        } else if(b === 1) {
+            // Rule 5
+            // {a, 1, #} = a
+            return a;
+        } else if(c === 1) {
             var n = 1;
+            while(array[n] === 1) {
+                n++;
+            }
+            n--;
+            var d = array[n + 1];
+            var pound = array.slice(n + 2);
+            if(1 < d && d < 2) {
+                // Rule 6
+                // {a, b, 1<n>, d, #} = {a, b, 1<n + 1>, #}^(2 - d) *  {a, b, 1<n>, 2, #}^(d - 1) if 1 < d < 2
+                var t1 = array.slice();
+                t1[n + 1] = 1;
+                t1 = normalize(t1);
+                
+                var t2 = array.slice();
+                t2[n + 1] = 2;
+                t2 = normalize(t2);
+
+                if(typeof t1 === "number" && typeof t2 === "number") {
+                    return t1 * (2 - d) + t2 * (d - 1);
+                }
+
+                if(typeof t1 === "number") {
+                    t1 = [Math.log10(t1)];
+                } else if(typeof t2 === "number") {
+                    t2 = [Math.log10(t2)];
+                }
+
+                if(t1.length === 1 && t2.length === 1) {
+                    return normalize([addLogs(t1[0] + Math.log10(2 - d), t2[0] + Math.log10(d - 1))]);
+                } else {
+                    return t2;
+                }
+            } else {
+                var result = [];
+                for(var i = 0; i < n; i++) {
+                    result.push(a);
+                }
+                if(b >= 2) {
+                    // Rule 8
+                    // {a, b, 1<n>, d, #} = {a<n + 1>, {a, b - 1, 1<n>, d, #}, d - 1, #} if b > 2 and d >= 2
+                    var temp = array.slice();
+                    temp[0]--;
+                    temp = normalize(temp);
+                    if(Number.isFinite(temp)) {
+                        result.push(temp);
+                    } else {
+                        return array;
+                    }
+                } else {
+                    // Rule 7
+                    // {a, b, 1<n>, d, #} = {a<n + 1>, a^(b - 1), d - 1, #} if 1 < b < 2 and d > 2
+                    result.push(Math.pow(a, b - 1));
+                }
+                result.push(d - 1);
+                return normalize(result.concat(pound));
+            }
+        } else if(1 < c && c < 2) {
+            // Rule 9
+            // {a, b, c, #} =  {a, b, 1, #}^(2 - c) * {a, b, 1, #}^(c - 1) if 1 < c < 2
+            var pound = array.slice(2);
+            var t1 = array.slice();
+            t1[1] = 1;
+            t1 = normalize(t1);
             
+            var t2 = array.slice();
+            t2[1] = 2;
+            t2 = normalize(t2);
+
+            if(typeof t1 === "number" && typeof t2 === "number") {
+                return t1 * (2 - c) + t2 * (c - 1);
+            }
+
+            if(typeof t1 === "number") {
+                t1 = [Math.log10(t1)];
+            } else if(typeof t2 === "number") {
+                t2 = [Math.log10(t2)];
+            }
+
+            if(t1.length === 1 && t2.length === 1) {
+                return normalize([addLogs(t1[0] + Math.log10(2 - c), t2[0] + Math.log10(c - 1))]);
+            } else {
+                return t2;
+            }
+        } else if(c >= 2) {
+            var pound = array.slice(2);
+            var result = [];
+            if(b >= 2) {
+                // Rule 11
+                // {a, b, c, #} = {a, {a, b - 1, c, #}, c - 1, #} if b >= 2 and c >= 2
+                var temp = array.slice();
+                temp[0]--;
+                temp = normalize(temp);
+                if(Number.isFinite(temp)) {
+                    result.push(temp);
+                } else {
+                    if(c % 1 === 0) {
+                        return array;
+                    } else {
+                        // The map thing irons out the remaining decimal arguments
+                        // for example {10, 3, 2.5} = {10, 3, 3}
+                        // (which is basically true anyways, they are very close googologically)
+                        return array.map((e, i) => i ? Math.ceil(e): e);
+                    }
+                }
+            } else {
+                // Rule 10
+                // {a, b, c, #} = {a, a^(b - 1), c - 1, #} if 1 < b < 2 and c >= 2
+                result.push(Math.pow(a, b - 1));
+            }
+            result.push(c - 1);
+            return normalize(result.concat(pound));
+        } else {
+            console.log("No BAN rules found for array " + JSON.stringify(array));
+            return array;
         }
     }
 
     class HugeNumber {
         constructor(sign, array) {
-            this.sign = sign
-            this.array = array;
+            this.sign = sign;
+            this.array = normalize(array, false);
         }
 
         clone() {
             return new HugeNumber(this.sign, this.array.slice());
         }
 
+        // Absolute value
         abs() {
             return new HugeNumber(1, this.array.slice());
         }
 
+        // Negation
         neg() {
             return new HugeNumber(-this.sign,  this.array.slice());
         }
 
+        // Absolute value then negation (this is faster than doing this.neg().abs())
         absNeg() {
             return new HugeNumber(-1, this.array.slice());
         }
 
+        // Addition
         add(other) {
+            // Deal with negative arguments
             if(this.sign === -1 && other.sign === -1) {
                 return this.abs().add(other.abs()).absNeg();
             } else if(this.sign === -1 && other.sign === 1) {
                 return this.abs().sub(other.absNeg()).absNeg();
             } else if(this.sign === 1 && other.sign === -1) {
                 return this.sub(other.abs());
+            } 
+            // Main part (both arguments are positive)
+            else if(this.array.length === 1 && other.array.length === 1) {
+                return new HugeNumber(1, [addLogs(this.array[0], other.array[0])]);
             } else {
-                if(typeof this.array === "number") {
-
-                }
+                return this.max(other);
             }
         }
+
+        // Three-way comparison operator 
+        // Returns 1 if this > other, 0 if this = other, and -1 if this < other
+        cmp(other) {
+            if(this.sign === -1 && other.sign === -1) {
+                return -this.abs().cmp(other.abs());
+            } else if(this.sign === -1 && other.sign === 1) {
+                return -1;
+            } else if(this.sign === 1 && other.sign === -1) {
+                return 1;
+            } else if(this.array.length > other.array.length) {
+                return 1;
+            } else if(this.array.length < other.array.length) {
+                return -1;
+            } else {
+                for (var i=this.array.length-1;i>=0;i--){
+                    if (this.array[i]>other.array[i]){
+                    return 1;
+                    }else if (this.array[i]<other.array[i]){
+                    return -1;
+                    }
+                }
+                return 0;
+            }
+        }
+
+        // Returns the maximum of this and other
+        max(other) {
+            return this.cmp(other) === 1 ? this.clone() : other.clone();
+        }
+
+
+        toString() {
+            if(this.array.length === 1) {
+                if(this.array[0] === -Infinity) {
+                    return "0";
+                } else if(this.array[0] < -324) {
+                    return Math.pow(10, this.array[0] - Math.floor(this.array[0])) + "e-" + Math.floor(-this.array[0]);
+                } else if(this.array[0] >= -324 && this.array[0] < LOG10_MAX_VALUE) {
+                    return Math.pow(10, this.array[0]).toString();
+                } else {
+                    return Math.pow(10, this.array[0] % 1) + "e+" + Math.floor(this.array[0]);
+                }
+            } else if(this.array.length === 2 && this.array[1] === 2) {
+                return "10^^" + this.array[0];
+            } else if(this.array.length === 2 && this.array[1] === 3) {
+                return "10^^^" + this.array[0];
+            } else if(this.array.length === 2 && this.array[1] === 4) {
+                return "10^^^^" + this.array[0];
+            } else if(this.array.length === 2 && this.array[1] > 4) {
+                return "10{" + this.array[1] + "}" + this.array[0];
+            } else {
+                return "{10," + this.array + "}";
+            }
+        }
+
+ 
+
 
     }
 
