@@ -321,6 +321,35 @@ var HugeNumber = (function () {
             }
         }
 
+            // Modulo
+            mod(other) {
+                if (typeof other === "number") {
+                    other = HugeNumber.fromNumber(other);
+                }
+    
+                // Use property that x % y = x - (floor(x / y) * y)
+                return this.abs().sub(this.abs().div(other).floor().mul(other));
+            }
+        
+
+        floor() {
+            var num = this.toNumber();
+            if(Number.isFinite(num)) {
+                return HugeNumber.fromNumber(Math.floor(num));
+            } else {
+                return this.clone();
+            }
+        }
+
+
+        ceil() {
+            var num = this.toNumber();
+            if(Number.isFinite(num)) {
+                return HugeNumber.fromNumber(Math.ceil(num));
+            } else {
+                return this.clone();
+            }
+        }
 
         // Three-way comparison operator 
         // Returns 1 if this > other, 0 if this = other, and -1 if this < other
