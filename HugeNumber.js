@@ -1,7 +1,21 @@
 // Wrapping all code in the function
 // so I can have private variables
 var HugeNumber = (function () {
+    // log10(Number.MAX_VALUE)
     const LOG10_MAX_VALUE = 308.25471555991675;
+
+    // Base-10 super-logarithm
+    // Using linear approximation for non-integer arguments
+    function slog10(z) {
+        if(z <= 0) {
+            return slog10(Math.pow(b, z)) - 1;
+        } else if(0 < z && z <= 1) {
+            return z - 1;
+        } else {
+            return slog10(Math.log10(z)) + 1;
+        }
+    }
+
     // returns log10(10^x + 10^y)
     function addLogs(x, y) {
         var gaussianLog = Math.log10(1 + Math.pow(10, y - x));
@@ -169,6 +183,7 @@ var HugeNumber = (function () {
     }
 
     class HugeNumber {
+        // Constructs HugeNumber from the sign and BAN array
         constructor(sign, array) {
             this.sign = sign;
             this.array = normalize(array, false);
@@ -179,6 +194,7 @@ var HugeNumber = (function () {
             }
         }
 
+        // Clones a HugeNumber object
         clone() {
             return new HugeNumber(this.sign, this.array.slice());
         }
@@ -216,6 +232,7 @@ var HugeNumber = (function () {
             else if(this.array.length === 1 && other.array.length === 1) {
                 return new HugeNumber(1, [addLogs(this.array[0], other.array[0])]);
             } else {
+                // At this scale, x + y is indistinguishable from max(x, y)
                 return this.max(other);
             }
         }
@@ -226,8 +243,12 @@ var HugeNumber = (function () {
                 other = HugeNumber.fromNumber(other);
             }
 
+            // x - x = 0
+            if(this.eq(other)) {
+                return HugeNumber.ZERO.clone();
+            }
             // Deal with negative arguments
-            if(this.sign === -1 && other.sign === -1) {
+            else if(this.sign === -1 && other.sign === -1) {
                 return this.abs().sub(other.abs()).absNeg();
             } else if(this.sign === -1 && other.sign === 1) {
                 return this.abs().add(other.absNeg()).absNeg();
@@ -238,6 +259,7 @@ var HugeNumber = (function () {
             else if(this.array.length === 1 && other.array.length === 1) {
                 return new HugeNumber(1, [subLogs(this.array[0], other.array[0])]);
             } else {
+                // At this scale, x - y is indistinguishable from max(x, y)
                 return this.max(other);
             }
         }
@@ -282,6 +304,7 @@ var HugeNumber = (function () {
                     return this.max(other);
                 }
             } else {
+                // At this scale, x * y is indistinguishable from max(x, y)
                 return this.max(other);
             }
         }
@@ -293,7 +316,9 @@ var HugeNumber = (function () {
             }
 
             var sign = this.sign * other.sign;
-            if(this.array.length === 1 && other.array.length === 1) {
+            if(this.eq(other)) {
+                return HugeNumber.ONE.clone();
+            } else if(this.array.length === 1 && other.array.length === 1) {
                 return new HugeNumber(sign, [this.array[0] - other.array[0]]);
             } else if(this.array.length === 2 && other.array.length === 1
                 && this.array[1] === 2) {
@@ -306,7 +331,7 @@ var HugeNumber = (function () {
                 }
             } else if(this.array.length === 1 && other.array.length === 2
                 && other.array[1] === 2) {
-                return new HugeNumber(0, [-Infinity]);
+                return HugeNumber.ZERO.clone();
             } else if(this.array.length === 2 && other.array.length === 2
                 && this.array[1] === 2 && other.array[1] === 2) {
                 var x = Math.pow(10, Math.pow(10, this.array[0] - 3));
@@ -317,8 +342,13 @@ var HugeNumber = (function () {
                     return this.max(other);
                 }
             } else {
-                return this.max(other);
-            }
+                // At this scale, x / y is indistinguishable from 0 if x < y or x if x > y
+                if(x.lt(y)) {
+                    return HugeNumber.ZERO.clone();
+                } else {
+                    return x.clone();
+                }
+            } 
         }
 
         // Modulo
@@ -330,9 +360,156 @@ var HugeNumber = (function () {
             // Use property that x % y = x - (floor(x / y) * y)
             return this.abs().sub(this.abs().div(other).floor().mul(other));
         }
+
+        // Base-10 exponential function
+        exp10() {
+            if(this.array.length === 1) {
+                return new HugeNumber(1, [slog10(this.array[0]) + 2, 2]);
+            } else if(this.array.length === 2 && this.array[1] === 2) {
+                // 10^(10^^x) = 10^^(x + 1)
+                return new HugeNumber(1, [this.array[0] + 1, 2]);
+            } else {
+                // At this scale, 10^x is indistinguishable from x
+                return this.clone();
+            }
+        }
+
+        // Base-e exponential function
+        exp() {
+            // Use change-of-base rule
+            return this.mul(Math.LOG10E).exp10();
+        }
         
+        // Exponentiation
+        pow(other) {
+            if (typeof other === "number") {
+                other = HugeNumber.fromNumber(other);
+            }
+
+            // Use change-of-base rule
+            return other.mul(this.log10()).exp10();
+        }
+
+        // Base-10 logarithm
+        log10() {
+            if(this.array.length === 1) {
+                return HugeNumber.fromNumber(this.array[0]);
+            } else if(this.array.length === 2 && this.array[1] === 2) {
+                // log10(10^^x) = 10^^(x - 1)
+                return new HugeNumber(1, [this.array[0] - 1, 2]);
+            } else {
+                // At this scale, log10(x) is indistinguishable from x
+                return this.clone();
+            }
+        }
+
+        // Base-e logarithm
+        log() {
+            // Use change-of-base rule
+            return this.mul(Math.LN10).log10();
+        }
+
+
+        // Sine
+        sin() {
+            return HugeNumber.fromNumber(Math.sin(this.toNumber()));
+        }
+
+        // Cosine
+        cos() {
+            return HugeNumber.fromNumber(Math.cos(this.toNumber()));
+        }
+
+                // Tangent
+                tan() {
+                    return HugeNumber.fromNumber(Math.tan(this.toNumber()));
+                }
+                
+                
+                // Inverse sine
+                asin() {
+                    return HugeNumber.fromNumber(Math.asin(this.toNumber()));
+                }
+                
+
+                // Inverse cosine
+                acos() {
+                    return HugeNumber.fromNumber(Math.acos(this.toNumber()));
+                }
+                
+
+                // Inverse tangent
+                atan() {
+                    return HugeNumber.fromNumber(Math.atan(this.toNumber()));
+                }
+
+                // Hyperbolic sine
+                sinh() {
+                    return HugeNumber.fromNumber(Math.sinh(this.toNumber()));
+                }
+                
+                // Hyperbolic cosine
+                cosh() {
+                    return HugeNumber.fromNumber(Math.cosh(this.toNumber()));
+                }
+                
+                // Hyperbolic tangent
+                tanh() {
+                    return HugeNumber.fromNumber(Math.tanh(this.toNumber()));
+                }
+                
+                // Inverse hyperbolic sine
+                asinh() {
+                    return HugeNumber.fromNumber(Math.asinh(this.toNumber()));
+                }
+                
+                // Inverse hyperbolic cosine
+                acosh() {
+                    return HugeNumber.fromNumber(Math.acosh(this.toNumber()));
+                }
+                
+                                // Inverse hyperbolic tangent
+                                atanh() {
+                                    return HugeNumber.fromNumber(Math.atanh(this.toNumber()));
+                                }
+              
+        // Returns {10, this, array[0], array[1], array[2], array[3]....} in Bird's Array Notation
+        ban10(array) {
+            var num = this.toNumber();
+            var array2 = array.slice();
+            array2[0]++;
+            if(Number.isFinite(num)) {
+                return new HugeNumber(1, [num, 1, 2]);
+            } else if(this.lt(new HugeNumber(1, [2.0000000000000004].concat(array2)))) {
+                var lower = 1;
+            var upper = 2.0000000000000004;
+            var middle = (lower + upper) / 2;
+            for(var i = 0; i < 70; i++) {
+                var temp = new HugeNumber(1, [middle].concat(array2));
+                if(temp.lt(this)) {
+                    lower = middle;
+                } else if(temp.gt(this)) {
+                    upper = middle;
+                } else {
+                    return new HugeNumber(1, [middle + 1].concat(array2));;
+                }
+
+                middle = (lower + upper) / 2;
+            }
+
+            return new HugeNumber(1, [middle + 1].concat(array2));
+        } else if(JSON.stringify(this.array.slice(1)) === JSON.stringify(array2)) {
+            return new HugeNumber(1, [this.array[0] + 1].concat(array2));
+        } else {
+            return this.clone();
+        }
+    }
 
         floor() {
+            if (typeof other === "number") {
+                other = HugeNumber.fromNumber(other);
+            }
+
             var num = this.toNumber();
             if(Number.isFinite(num)) {
                 return HugeNumber.fromNumber(Math.floor(num));
@@ -343,6 +520,10 @@ var HugeNumber = (function () {
 
 
         ceil() {
+            if (typeof other === "number") {
+                other = HugeNumber.fromNumber(other);
+            }
+
             var num = this.toNumber();
             if(Number.isFinite(num)) {
                 return HugeNumber.fromNumber(Math.ceil(num));
@@ -369,11 +550,11 @@ var HugeNumber = (function () {
             } else if(this.array.length < other.array.length) {
                 return -1;
             } else {
-                for (var i=this.array.length-1;i>=0;i--){
-                    if (this.array[i]>other.array[i]){
-                    return 1;
-                    }else if (this.array[i]<other.array[i]){
-                    return -1;
+                for (var i = this.array.length - 1;i >= 0; i--) {
+                    if (this.array[i] > other.array[i]){
+                        return 1;
+                    }else if (this.array[i] < other.array[i]){
+                        return -1;
                     }
                 }
                 return 0;
@@ -464,6 +645,10 @@ var HugeNumber = (function () {
             return new HugeNumber(Math.sign(num), [Math.log10(Math.abs(num))]);
         }
     }
+
+    // Constants
+    HugeNumber.ZERO = new HugeNumber(0, [-Infinity]);
+    HugeNumber.ONE = new HugeNumber(1, [0]);
 
     return HugeNumber;
 })();
