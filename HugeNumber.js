@@ -8,7 +8,7 @@ var HugeNumber = (function () {
     // Using linear approximation for non-integer arguments
     function slog10(z) {
         if(z <= 0) {
-            return slog10(Math.pow(b, z)) - 1;
+            return slog10(Math.pow(10, z)) - 1;
         } else if(0 < z && z <= 1) {
             return z - 1;
         } else {
@@ -39,7 +39,7 @@ var HugeNumber = (function () {
     
     // Normalizes an array in my continuous extension of linear BAN
     // (the first term is implicit 10, so {10,100,1,2} -> [100,1,2])
-    function normalize(array, outputVanillaNumbers = true) {
+    function normalize(array) {
         var a = 10;
         var b = array[0];
         var c = array[1];
@@ -50,7 +50,7 @@ var HugeNumber = (function () {
         } else if(array.length === 1) {
             // Rule 3
             // {a, b} = a^b
-            if(b < LOG10_MAX_VALUE && outputVanillaNumbers) {
+            if(b < LOG10_MAX_VALUE) {
                 return Math.pow(a, b);
             } else {
                 return array;
@@ -62,7 +62,11 @@ var HugeNumber = (function () {
         } else if(b === 1) {
             // Rule 5
             // {a, 1, #} = a
+            // if(outputVanillaNumbers) {
             return a;
+            // } else {
+            //     return [1];
+            // }
         } else if(c === 1) {
             var n = 1;
             while(array[n] === 1) {
@@ -134,7 +138,11 @@ var HugeNumber = (function () {
             t2 = normalize(t2);
 
             if(typeof t1 === "number" && typeof t2 === "number") {
+                // if(outputVanillaNumbers) {
                 return t1 * (2 - c) + t2 * (c - 1);
+                // } else {
+                //     return [Math.log10(t1 * (2 - c) + t2 * (c - 1))];
+                // }
             }
 
             if(typeof t1 === "number") {
@@ -152,6 +160,9 @@ var HugeNumber = (function () {
             var pound = array.slice(2);
             var result = [];
             if(b >= 2) {
+                if(b >= 10) {
+                    return array;
+                }
                 // Rule 11
                 // {a, b, c, #} = {a, {a, b - 1, c, #}, c - 1, #} if b >= 2 and c >= 2
                 var temp = array.slice();
@@ -186,7 +197,10 @@ var HugeNumber = (function () {
         // Constructs HugeNumber from the sign and BAN array
         constructor(sign, array) {
             this.sign = sign;
-            this.array = normalize(array, false);
+            this.array = normalize(array);
+            if(typeof this.array === "number") {
+                this.array = [Math.log10(this.array)];
+            }
             if(this.array[0] === -Infinity) {
                 this.sign = 0;
             } else if(this.array[0] === NaN) {
@@ -364,7 +378,11 @@ var HugeNumber = (function () {
         // Base-10 exponential function
         exp10() {
             if(this.array.length === 1) {
+                if(this.array[0] < LOG10_MAX_VALUE) {
+                    return new HugeNumber(1, [this.toNumber()]);
+                } else {
                 return new HugeNumber(1, [slog10(this.array[0]) + 2, 2]);
+                }
             } else if(this.array.length === 2 && this.array[1] === 2) {
                 // 10^(10^^x) = 10^^(x + 1)
                 return new HugeNumber(1, [this.array[0] + 1, 2]);
@@ -475,11 +493,14 @@ var HugeNumber = (function () {
               
         // Returns {10, this, array[0], array[1], array[2], array[3]....} in Bird's Array Notation
         ban10(array) {
+            if(array[0] > 1 && array[0] < 2) {
+                return this.ban10([1].concat(array.slice(1))).mul(array[0] - 1).add(this.ban10([2].concat(array.slice(1))).mul(2 - array[0]));
+            }
             var num = this.toNumber();
             var array2 = array.slice();
             array2[0]++;
             if(Number.isFinite(num)) {
-                return new HugeNumber(1, [num, 1, 2]);
+                return new HugeNumber(1, [num].concat(array));
             } else if(this.lt(new HugeNumber(1, [2.0000000000000004].concat(array2)))) {
                 var lower = 1;
             var upper = 2.0000000000000004;
@@ -503,6 +524,33 @@ var HugeNumber = (function () {
         } else {
             return this.clone();
         }
+    }
+
+     // Returns {this, other, array[0], array[1], array[2], array[3]....} in Bird's Array Notation
+    ban(other, array) {
+        if (typeof other === "number") {
+            other = HugeNumber.fromNumber(other);
+        }
+
+        if(array[0] > 1 && array[0] < 2) {
+            return this.ban(other, [1].concat(array.slice(1))).mul(array[0] - 1).add(this.ban(other, [2].concat(array.slice(1))).mul(2 - array[0]));
+        }
+        
+        if(array.length === 1 && array[0] === 1) { 
+            return this.pow(other);
+        }
+
+        var temp = new HugeNumber(1, [0]);
+        for(var i = 0; i < 7; i++) {
+            if(i === other.toNumber()) {
+                return temp;
+            }
+            // temp = this.ban(temp);
+            temp = this.ban(temp, [array[0] - 1].concat(array.slice(1)));
+            console.log(temp.toString());
+        }
+        var offset = temp.array[0] - 6;
+        return other.add(offset).ban10(array);
     }
 
         floor() {
