@@ -1,14 +1,23 @@
 // Wrapping all code in the function
 // so I can have private variables
 var HugeNumber = (function () {
-    const ARROW_LIMITS = [2.396009145337229,1.3794884713808426,1.1397180753577167,1.0567974360219186,1.0239917509322818,1.0102964580665499,1.0044488304267691,1.0019278174114663,1.000836434476243,1.0003631070410433,1.0001576667610421,1.0000684684068455,1.0000297344333546,1.0000129133083444,1.0000056081423478,1.0000024355784451,1.0000010577569909,1.0000004593777803,1.0000001995051901,1.0000000866439955,1.0000000376290075,1.0000000163420704,1.0000000070972699,1.0000000030823064,1.0000000013386274,1.000000000581359,1.0000000002524811,1.000000000109651,1.0000000000476201,1.0000000000206821,1.0000000000089813,1.0000000000039009,1.0000000000016946,1.000000000000735,1.0000000000003197,1.0000000000001381,1.0000000000000608,1.0000000000000262,1.000000000000011,1.0000000000000062,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013];
+    const ARROW_LIMITS = [308.25471555991675, 2.396009145337229,1.3794884713808426,1.1397180753577167,1.0567974360219186,1.0239917509322818,1.0102964580665499,1.0044488304267691,1.0019278174114663,1.000836434476243,1.0003631070410433,1.0001576667610421,1.0000684684068455,1.0000297344333546,1.0000129133083444,1.0000056081423478,1.0000024355784451,1.0000010577569909,1.0000004593777803,1.0000001995051901,1.0000000866439955,1.0000000376290075,1.0000000163420704,1.0000000070972699,1.0000000030823064,1.0000000013386274,1.000000000581359,1.0000000002524811,1.000000000109651,1.0000000000476201,1.0000000000206821,1.0000000000089813,1.0000000000039009,1.0000000000016946,1.000000000000735,1.0000000000003197,1.0000000000001381,1.0000000000000608,1.0000000000000262,1.000000000000011,1.0000000000000062,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013,1.0000000000000013];
 
     const LNLN2 = -0.36651292058166435;
+
+    const FS_EXPANSION_CAP = 100;
+
+    function slog10(x) {
+        if(0 <= x && x <= 1) {
+            return x - 1;
+        } else {
+            return slog10(Math.log10(x)) + 1;
+        }   
+    }
 
     function jsonEq(a, b) {
         return JSON.stringify(a) === JSON.stringify(b);
     }
-
 
     function cmpOrd(a, b) {
         if (typeof a === "number" && typeof b === "number") {
@@ -38,6 +47,7 @@ var HugeNumber = (function () {
             return 0;
         }
     }
+
 
     function normalizeOrd(ord) {
         if (typeof ord === "number") {
@@ -138,24 +148,25 @@ var HugeNumber = (function () {
     }
 
     // 10-growing hierarchy
+    // (THIS FUNCTION OPERATES ON JS NUMBERS, NOT HUGENUMBERS. THIS IS JUST A UTILITY FUNCTION.)
     function tgh(ord, n) {
-        if(ord[0] == 0 && ord[1] === 0) {
+        if(ord === 0) {
             return 10 * n;
-        } else if(ord[0] === 1) {
+        } else if(ord === 1) {
             return Math.pow(10, n);
-        } else if((ord[0] >= 2 && n >= 2.396009)
-            || (ord >= 3 && n >= 1.3794)) {
+        } /* else if((ord >= 2 && n >= ARROW_LIMITS[0])
+            || (ord >= 3 && n >= ARROW_LIMITS[1])) {
             return Infinity;
-        } else if(ord[0] === 0 && ord[1] === 1) {
+        } */ else if(ord[0] === 0 && ord[1] === 1) {
             return Math.pow(tgh([Math.floor(n)], 10), 1 - (n % 1)) * Math.pow(tgh([Math.ceil(n)], 10), (n % 1));
         } else {
             try {
                 if(0 <= n && n <= 1) {
                     return Math.pow(10, n);
                 } else {
-                    var result = tgh(ord, n % 1 + 1);
+                    var result = Math.pow(10, Math.pow(Math.log10(tgh(ord - 1, 10)), n % 1));
                     for(var i = 0; i < Math.floor(n - 1); i++) {
-                        result = tgh([ord[0] - 1, ord.length > 1 ? ord[1] : 0], result);
+                        result = tgh(ord - 1, result);
                     }
                     return result;
                 }
@@ -172,10 +183,16 @@ var HugeNumber = (function () {
             this.ord = normalizeOrd(ord);
             this.n = n;
             var i = 0;
-            while(isLimitOrd(this.ord) && i < 100) {
+            while(isLimitOrd(this.ord) && i < FS_EXPANSION_CAP) {
                 this.ord = normalizeOrd(getFSTerm(this.ord, this.n));
                 i++;
             }   
+            if(typeof this.ord === "number") {
+                while(this.n < (ARROW_LIMITS[this.ord - 1] + 1) && this.ord >= 0) {
+                    this.n = tgh(this.ord, this.n - 1);
+                    this.ord--;
+                }
+            }
         }
 
         clone() {
@@ -194,16 +211,74 @@ var HugeNumber = (function () {
             return new HugeNumber(-1, this.ord.slice(), this.n);
         }
 
+        cmp(other) {
+            if (this.sign === -1 && other.sign === -1) {
+                return this.negAbs().cmp(other.negAbs());
+            } else if(this.sign === -1 && other.sign === 1) {
+                return -1;
+            } else if(this.sign === 1 && other.sign === -1) {
+                return 1;    
+            }
+
+            if (jsonEq(this.ord, other.ord)) {
+                return (this.n < other.n ? -1 : (this.n === other.n ? 0 : 1));
+            } else {
+                return cmpOrd(this.ord, other.ord);
+            }
+        }
+        
+
+        eq(other) {
+            return this.cmp(other) === 0;
+        }
+
+        ne(other) {
+            return this.cmp(other) !== 0;
+        }
+
+        lt(other) {
+            return this.cmp(other) < 0;
+        }
+
+        le(other) {
+            return this.cmp(other) <= 0;
+        }
+
+        gt(other) {
+            return this.cmp(other) > 0;
+        }
+
+        ge(other) {
+            return this.cmp(other) >= 0;
+        }
+
+        min(other) {
+            return this.lt(other) ? this.clone() : other;
+        }
+
+        max(other) {
+            return this.gt(other) ? this.clone() : other;
+        }
+
         add(other) {
             if(this.sign === -1 && other.sign === -1) {
                 return this.abs().add(other.abs()).negAbs();
             } else if(this.sign === -1 && other.sign === 1) {
-                return this.abs().sub(other).negAb();
+                return other.sub(this.abs());
             } else if(this.sign === 1 && other.sign === -1) {
                 return this.sub(other.abs());
             } else {
                 if(this.ord === 0 && other.ord === 0) {
                     return new HugeNumber(1, [], this.n + other.n);
+                } else if(this.ord === 1 && other.ord === 0) {
+                    var temp = Math.log10(1 + Math.pow(10, Math.log10(other.n) + 1 - this.n));
+                    if(Number.isFinite(temp)) {
+                        return new HugeNumber(1, 1, this.n + temp);
+                    } else {
+                        return other.clone();
+                    }                    
+                } else if(this.ord === 0) {
+                    return other.add(this);
                 } else if(this.ord === 1 && other.ord === 1) {
                     var temp = Math.log10(1 + Math.pow(10, other.n - this.n));
                     if(Number.isFinite(temp)) {
@@ -212,14 +287,122 @@ var HugeNumber = (function () {
                         return other.clone();
                     }
                 } else {
-
+                    return this.max(other);
                 }
             }
         }
 
-        static getFSTerm(ord, n) {
-            return getFSTerm(ord, n);
+        sub(other) {
+            if(this.sign === -1 && other.sign === -1) {
+                return this.abs().sub(other.abs()).negAbs();
+            } else if(this.sign === -1 && other.sign === 1) {
+                return other.add(this.abs());
+            } else if(this.sign === 1 && other.sign === -1) {
+                return this.add(other.abs());
+            } else {
+                if(this.ord === 0 && other.ord === 0) {
+                    return new HugeNumber(1, 0, this.n + other.n);
+                } else if(this.ord === 1 && other.ord === 0) {
+                    var temp = Math.log10(1 + Math.pow(10, Math.log10(other.n) + 1 - this.n));
+                    if(Number.isFinite(temp)) {
+                        return new HugeNumber(1, 2, slog10(x + temp) + 2);
+                    } else {
+                        return other.clone();
+                    }             
+                } else if(this.ord === 0) {
+                    return other.add(this);
+                } else if(this.ord === 1 && other.ord === 1) {
+                    var temp = Math.log10(1 + Math.pow(10, other.n - this.n));
+                    if(Number.isFinite(temp)) {
+                        return new HugeNumber(1, 1, this.n + temp);
+                    } else {
+                        return other.clone();
+                    }
+                } else {
+                    return this.max(other);
+                }
+            }
         }
+
+        mul(other) {
+            var sign = this.sign * other.sign;
+
+
+            if(this.ord === 0 && other.ord === 0) {
+                return new HugeNumber(sign, 0, this.n * other.n * 0.1);
+            } else if(this.ord === 1 && other.ord === 0) {
+                return new HugeNumber(sign, 0, this.n + Math.log10(other.n) + 1);                   
+            } else if(this.ord === 0) {
+                return other.mul(this);
+            } else if(this.ord === 1 && other.ord === 1) {
+                return new HugeNumber(sign, 0, this.n + other.n);
+            } else if(this.ord === 2) {
+                var x = Math.pow(10, Math.pow(10, this.n - 3));
+                var y = other.ord === 2 ? Math.pow(10, Math.pow(10, other.n - 3)) :  Math.log10(other.n);
+                if(Number.isFinite(x) && Number.isFinite(y)) {
+                var temp = Math.log10(1 + Math.pow(10, y - x));
+                if(Number.isFinite(temp)) {
+                    return new HugeNumber(1, 2, slog10(x + temp) + 2);
+                } else {
+                    return other.clone();
+                }
+            } else {
+                return this.max(other);
+            }
+            } else if(this.ord === 1) {
+                return other.mul(this);
+            } else {
+                return this.max(other);
+            }
+        }
+
+        div(other) {
+            var sign = this.sign * other.sign;
+
+            if(this.ord === 0 && other.ord === 0) {
+                return new HugeNumber(sign, 0, (this.n / other.n) * 10);
+            } else if(this.ord === 1 && other.ord === 0) {
+                return new HugeNumber(sign, 0, this.n - Math.log10(other.n) - 1);                   
+            }  else if(this.ord === 0 && other.ord === 1) {
+                return new HugeNumber(sign, 0, Math.log10(this.n) + 1 - other.n);            
+            } else if(this.ord === 1 && other.ord === 1) {
+                return new HugeNumber(sign, 0, this.n + other.n);
+            } else if(this.ord === 2) {
+                var x = Math.pow(10, Math.pow(10, this.n - 3));
+                var y = other.ord === 2 ? Math.pow(10, Math.pow(10, other.n - 3)) :  Math.log10(other.n);
+                if(Number.isFinite(x) && Number.isFinite(y)) {
+                var temp = Math.log10(1 + Math.pow(10, y - x));
+                if(Number.isFinite(temp)) {
+                    return new HugeNumber(1, 2, slog10(x + temp) + 2);
+                } else {
+                    return other.clone();
+                }
+            } else {
+                return this.max(other);
+            }
+            } else if(this.ord === 1) {
+                return other.mul(this);
+            } else {
+                return this.max(other);
+            }
+        }
+
+
+        toString() {
+            if(this.ord === 0) {
+                if(this.n >= (Number.MAX_VALUE / 10)) {
+                    return this.n.toString().replace(/308/g,"309").replace(/307/g,"308");
+                }
+                return (this.n * 10).toString();
+            } else if(this.ord === 1) {
+                var exponent = Math.floor(this.n);
+                var mantissa = Math.pow(10, this.n - exponent);
+                return mantissa + "e+" + exponent;
+            } else {
+                return "[10]_" + ordToString(this.ord) + "(" + this.n + ")";
+            }
+        }
+
     }
 
     return HugeNumber;
