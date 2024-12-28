@@ -577,7 +577,7 @@ var HugeNumber = (function () {
             if (Number.isFinite(n)) {
                 return new HugeNumber(1, 1, n);
             } else if(this.ord === 0) {
-                return  new HugeNumber(1, 2, slog10(Math.log10(this.ord) + 1) + 2);
+                return  new HugeNumber(1, 2, slog10(Math.log10(this.n) + 1) + 2);
             } else if(this.ord === 1) {
                 return  new HugeNumber(1, 2, slog10(this.n) + 2);
             } else if(this.ord === 2) {
