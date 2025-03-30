@@ -264,9 +264,9 @@ var HugeNumber = (function () {
             
             // Deal with negative arguments
             if(this.sign === -1 && other.sign === -1) {
-                return this.abs().add(other.abs()).absNeg();
+                return this.neg().add(other.neg()).absNeg();
             } else if(this.sign === -1 && other.sign === 1) {
-                return this.abs().sub(other.absNeg()).absNeg();
+                return this.abs().sub(other).neg();
             } else if(this.sign === 1 && other.sign === -1) {
                 return this.sub(other.abs());
             } 
@@ -293,10 +293,14 @@ var HugeNumber = (function () {
             else if(this.sign === -1 && other.sign === -1) {
                 return this.abs().sub(other.abs()).absNeg();
             } else if(this.sign === -1 && other.sign === 1) {
-                return this.abs().add(other.absNeg()).absNeg();
+                return other.add(this.abs()).absNeg();
             } else if(this.sign === 1 && other.sign === -1) {
                 return this.add(other.abs());
-            } 
+            }
+            // a - b = -(b - a)
+            else if(this.lt(other)) {
+                return other.sub(this).neg();
+            }
             // Main part (both arguments are positive)
             else if(this.array.length === 1 && other.array.length === 1) {
                 return new HugeNumber(1, [subLogs(this.array[0], other.array[0])]);
@@ -449,7 +453,7 @@ var HugeNumber = (function () {
             }
         }
 
-        // Base-e logarithm
+        // Natural logarithm
         log() {
             // Use change-of-base rule
             return this.log10().mul(Math.LN10);
@@ -457,13 +461,13 @@ var HugeNumber = (function () {
 
 
         // Any base logarithm
-        logb(base) {
-            if (typeof base === "number") {
-                base = HugeNumber.fromNumber(base);
+        logb(b) {
+            if (typeof b === "number") {
+                b = HugeNumber.fromNumber(b);
             }
 
             // Use change-of-base rule
-            return this.log10().div(base.log10());
+            return this.log10().div(b.log10());
         }
 
         // Sine
@@ -616,8 +620,8 @@ var HugeNumber = (function () {
             } else if(this.le(E_TO_1_OVER_E)) {
                 return this.tetr(tetrCap);
             } else {
-                var offset = this.tetr(tetrCap).slog10().toNumber() - tetrCap;
-                return other.add(offset).tetr10();
+                var offset = this.tetr(tetrCap).slog10().sub(tetrCap);
+                return other.sub(offset).tetr10();
             }
         }
 
@@ -632,7 +636,7 @@ var HugeNumber = (function () {
         }
 
         // Super-square root
-        ssrt() {
+        ssqrt() {
             var result = this.log().div(this.log().lambertw());  
             if(this.ne(1) && result.eq(1)) {
                 return this.clone();
@@ -641,7 +645,7 @@ var HugeNumber = (function () {
             }
         }
 
-        // Base-10 tetration
+        // Base-10 super-logarithm
         slog10() {
             var num = this.toNumber();
             if (0 < num && num <= 1) {
@@ -663,12 +667,30 @@ var HugeNumber = (function () {
             }
         } 
 
-        slogb(base) {
-            
+        // Arbitrary-base super-logarithm
+        slogb(b) {
+            if (typeof b === "number") {
+                b = HugeNumber.fromNumber(b);
+            }
+
+            var num = this.toNumber();
+            var tetrCap = b.gt(E_TO_1_OVER_E) && b.lt(1.5) ? 5000 : 15;
+            if(num <= 0) {
+                return b.pow(this).slogb(b).sub(1);
+            } else if(0 < num && num <= 1) {
+                return HugeNumber.fromNumber(num - 1);
+            } else if(this.lt(b.tetr(tetrCap))) {
+                return this.logb(b).slogb(b).add(1);
+            } else if(b.le(E_TO_1_OVER_E)) {
+                return HugeNumber.fromNumber(Infinity);
+            } else {
+                var offset = b.tetr(tetrCap).slog10().sub(tetrCap);
+                return this.slog10().add(offset);
+            }
         }
 
         // Returns {10, this, array[0], array[1], array[2], array[3]....} in Bird's Array Notation
-        ban10(array) {
+        blan10(array) {
             if(JSON.stringify(array) === "[1]") {
                 return this.exp10();
             } else if(JSON.stringify(array) === "[2]") {
@@ -801,7 +823,7 @@ var HugeNumber = (function () {
         }
 
         
-        // Converts HugeNumber to vanilla number
+        // Converts HugeNumber to standard (built-in) number
         toNumber() {
             if(this.array.length === 1) {
                 return this.sign * Math.pow(10, this.array[0]);
@@ -812,6 +834,10 @@ var HugeNumber = (function () {
 
         // Converts HugeNumber to string
         toString() {
+            if(this.sign === -1) {
+                return "-" + this.abs().toString();
+            }
+
             if(this.array.length === 1) {
                 if(this.array[0] === -Infinity) {
                     return "0";
@@ -835,9 +861,28 @@ var HugeNumber = (function () {
             }
         }
 
-        // Converts a JS number to a HugeNumber
+        // Converts a standard (built-in) number to a HugeNumber
         static fromNumber(num) {
             return new HugeNumber(Math.sign(num), [Math.log10(Math.abs(num))]);
+        }
+
+        static fromString(str) {
+            str = str.toLowerCase();
+            this.sign = 1;
+
+            if (str[0] === "-") {
+                // Handle negative number strings
+                return HugeNumber.fromString(str.slice(1)).absNeg();
+            }
+
+            // Convert from string
+            // Currently can include scientific notation (even nested exponent like "1e1e1e1e500") but not arrows
+            var parts = str.split("e").map(Number);
+            var temp = HugeNumber.fromNumber(Number(parts[parts.length - 1]));
+            for (var i = parts.length - 2; i >= 0; i--) {
+                temp = HugeNumber.fromNumber(Number(parts[i])).mul(temp.exp10());
+            }
+            return new HugeNumber(1, temp.array);
         }
     }
 

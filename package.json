@@ -1,7 +1,7 @@
 {
   "name": "hugenumberjs",
   "version": "1.0.1",
-  "description": "A library for storing extremely large numbers (up to {10, 1000, 1, 1, 2}) in JavaScript.",
+  "description": "A library for storing extremely large numbers in JavaScript.",
   "main": "HugeNumber.js",
   "directories": {
     "test": "test"
